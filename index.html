@@ -349,7 +349,7 @@ textarea { min-height: 120px; resize: vertical; line-height: 1.5; }
 "use strict";
 
 /* Bump on every change so it's easy to see which version is live. */
-const APP_VERSION = "v1.13 · Nov 12, 2026";
+const APP_VERSION = "v1.14 · Nov 12, 2026";
 
 /* ---------- Reference data ---------- */
 const CONTINENTS = {
@@ -698,6 +698,10 @@ $("authForm").addEventListener("submit", async e => {
       if (!data.session) showCheckEmail(email);
     } else {
       const { error } = await sb.auth.signInWithPassword({ email, password });
+      if (error && /not confirmed/i.test(error.message || "")) {
+        showCheckEmail(email, true);
+        return;
+      }
       if (error) throw error;
     }
   } catch (err) {
@@ -707,13 +711,22 @@ $("authForm").addEventListener("submit", async e => {
 
 /* "Check your email" screen after sign-up */
 let resendTimer = null;
-function showCheckEmail(email) {
+function showCheckEmail(email, notConfirmedYet) {
   $("authForm").hidden = true;
   $("checkEmail").hidden = false;
   $("checkEmailAddr").textContent = email;
-  $("resendMsg").textContent = "";
   $("checkEmail").dataset.email = email;
-  startResendCooldown(60);
+  const m = $("resendMsg");
+  if (notConfirmedYet) {
+    // Came from signing in: their link may be old, so let them send a fresh one now.
+    m.textContent = "This account isn't confirmed yet. Only the newest email's link works, so click Resend email to get a fresh one.";
+    m.style.color = "";
+    clearInterval(resendTimer);
+    $("resendBtn").disabled = false; $("resendBtn").textContent = "Resend email";
+  } else {
+    m.textContent = "";
+    startResendCooldown(60);
+  }
 }
 function startResendCooldown(sec) {
   const b = $("resendBtn");
