@@ -349,7 +349,7 @@ textarea { min-height: 120px; resize: vertical; line-height: 1.5; }
 "use strict";
 
 /* Bump on every change so it's easy to see which version is live. */
-const APP_VERSION = "v1.12 · Nov 12, 2026";
+const APP_VERSION = "v1.13 · Nov 12, 2026";
 
 /* ---------- Reference data ---------- */
 const CONTINENTS = {
@@ -891,11 +891,28 @@ async function initAuth() {
     setStatus("warn", "Not connected to a database yet");
     return;
   }
+  // An email link that failed comes back as #error=…&error_code=…; read it before Supabase does.
+  const linkError = readLinkError();
   sb = window.supabase.createClient(url, key);
   setAuthMode("signin");
   sb.auth.onAuthStateChange((event, s) => handleSession(s, event));
   const { data } = await sb.auth.getSession();
   if (!data.session) handleSession(null);
+  if (linkError && !data.session) {
+    showView("auth");
+    authMsg(linkError, true);
+  }
+}
+
+function readLinkError() {
+  const h = location.hash.startsWith("#") ? location.hash.slice(1) : "";
+  if (!/(^|&)error(_code)?=/.test(h)) return "";
+  const q = new URLSearchParams(h);
+  const code = q.get("error_code") || q.get("error") || "";
+  try { history.replaceState(null, "", location.pathname + location.search); } catch {}
+  if (code === "otp_expired")
+    return "That email link has expired or was already used. If you just confirmed your account, try signing in below. If that doesn't work, choose Create a new account with the same email to get a fresh link.";
+  return "That email link didn't work (" + (q.get("error_description") || code).replace(/\+/g, " ") + "). Try signing in, or request a new link.";
 }
 
 /* ---------- Map geometry (loaded from a public CDN) ---------- */
