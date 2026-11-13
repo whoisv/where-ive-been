@@ -349,7 +349,7 @@ textarea { min-height: 120px; resize: vertical; line-height: 1.5; }
 "use strict";
 
 /* Bump on every change so it's easy to see which version is live. */
-const APP_VERSION = "v1.10 · Nov 12, 2026";
+const APP_VERSION = "v1.11 · Nov 12, 2026";
 
 /* ---------- Reference data ---------- */
 const CONTINENTS = {
@@ -451,6 +451,7 @@ function setStatus(kind, text) {
   $("statusText").replaceChildren(el("i", { class: "dot" }), text);
 }
 function canEdit() { return P.mode === "cloud" && !!session && !P.readOnly; }
+const pendingCodes = () => new Set([...P.timers.keys(), ...P.inflight, ...P.dirty]);   // countries with unsaved changes
 const displayName = () => {
   if (!session) return "";
   const meta = session.user.user_metadata || {};
