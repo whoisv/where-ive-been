@@ -13,6 +13,7 @@ A travel map anyone can sign up for. Each person marks the countries they've vis
 - **Rank among all travelers** and your percentile, worked out without revealing anyone's countries.
 - **Leaderboards** (opt-in, by screen name): all travelers, most countries this year, each continent, your home country and your home state.
 - **Checklist and search** to tick countries off quickly, plus **Import a list** (paste names) and **Copy my list**.
+- **Delete my account** in Profile: removes the login and all of that person's data.
 - **Accounts:** email sign-up, password reset, optional Google sign-in, a screen name (defaults to the email address), and a home country, state and continent.
 - About 70 small countries and islands appear as dots. Territories count toward their parent country (Hong Kong with China, Puerto Rico with the US).
 
@@ -64,6 +65,7 @@ flowchart LR
 | `countries-data.js` | Facts that rarely change, for about 200 countries: capital, currency, government, main religion, languages |
 | `schema.sql` | Creates the `visits` table, its security rules and the ranking function. Run once. |
 | `stats.sql` | The ranking function on its own, for databases set up before rankings were added |
+| `delete-account.sql` | Lets users delete their own account and all their data from Profile. Run once. |
 | `leaderboard.sql` | Public profiles (opt-in), the country-to-continent table, the `leaderboard()` function and percentile. Run once. |
 
 ## Data model
@@ -152,5 +154,6 @@ Saved countries and accounts live in Supabase, so redeploying never touches them
 | "Email rate limit exceeded" | See step 6 |
 | Countries don't save | Make sure `schema.sql` ran without errors and `visits` exists |
 | No rank tile | Run `stats.sql` in the SQL Editor |
+| "Account deletion isn't set up yet" | Run `delete-account.sql` in the SQL Editor |
 | "Leaderboards aren't set up yet" | Run `leaderboard.sql` in the SQL Editor, then refresh |
 | A country page stays on "Loading…" | The World Bank or Wikipedia didn't answer. Refresh, or try again later. |

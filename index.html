@@ -226,6 +226,10 @@ textarea { min-height: 120px; resize: vertical; line-height: 1.5; }
 .lb .sc small { display: block; font-size: 11px; color: var(--muted); }
 .ver { position: absolute; right: 12px; bottom: 10px; font-family: var(--font-mono); font-size: 11px; color: var(--muted); background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 2px 7px; }
 .check-icon { width: 52px; height: 52px; border-radius: 50%; display: grid; place-items: center; font-size: 26px; background: var(--accent-soft); color: var(--accent); }
+.danger-zone { border: 1px solid color-mix(in srgb, var(--danger) 40%, var(--line)); border-radius: 10px; padding: 14px; margin-top: 8px; }
+.danger-zone h3 { color: var(--danger); }
+.danger-btn { border-color: var(--danger); color: var(--danger); }
+.danger-btn:not(:disabled):hover { background: var(--danger); color: #fff; }
 .toast { position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); background: var(--ink); color: var(--bg); padding: 8px 14px; border-radius: 8px; font-size: 13px; opacity: 0; pointer-events: none; transition: opacity .2s; }
 .toast.show { opacity: 1; }
 
@@ -345,7 +349,7 @@ textarea { min-height: 120px; resize: vertical; line-height: 1.5; }
 "use strict";
 
 /* Bump on every change so it's easy to see which version is live. */
-const APP_VERSION = "v1.9 · Nov 12, 2026";
+const APP_VERSION = "v1.10 · Nov 12, 2026";
 
 /* ---------- Reference data ---------- */
 const CONTINENTS = {
@@ -817,10 +821,44 @@ function openProfile() {
       save.disabled = false; save.textContent = "Save";
     }
   });
+  // Delete account
+  const delInput = el("input", { type: "text", id: "deleteConfirm", autocomplete: "off", placeholder: "Type DELETE to confirm" });
+  const delBtn = el("button", { type: "button", class: "visit-btn danger-btn", disabled: true }, "Delete my account");
+  const delMsg = el("p", { class: "hint", "aria-live": "polite" });
+  delInput.addEventListener("input", () => { delBtn.disabled = delInput.value.trim() !== "DELETE"; });
+  delBtn.onclick = async () => {
+    if (delInput.value.trim() !== "DELETE") return;
+    delBtn.disabled = true; delBtn.textContent = "Deleting…"; delMsg.textContent = ""; delMsg.style.color = "";
+    try {
+      const { error } = await sb.rpc("delete_my_account");
+      if (error) {
+        delMsg.textContent = /function|schema cache|does not exist/i.test(error.message || "")
+          ? "Account deletion isn't set up yet. The site owner needs to run delete-account.sql in Supabase."
+          : "Couldn't delete your account: " + (error.message || "unknown error");
+        delMsg.style.color = "var(--danger)";
+        delBtn.disabled = false; delBtn.textContent = "Delete my account";
+        return;
+      }
+      try { await sb.auth.signOut(); } catch {}
+      try { Object.keys(localStorage).filter(k => k.startsWith("sb-")).forEach(k => localStorage.removeItem(k)); } catch {}
+      setTimeout(() => authMsg("Your account and all your travel data have been deleted."), 400);
+      toast("Account deleted");
+    } catch (err) {
+      delMsg.textContent = "Couldn't delete your account: " + ((err && err.message) || String(err));
+      delMsg.style.color = "var(--danger)";
+      delBtn.disabled = false; delBtn.textContent = "Delete my account";
+    }
+  };
+  const danger = el("section", { class: "sec danger-zone" },
+    el("h3", { text: "Delete my account" }),
+    el("p", { class: "hint", text: "Permanently deletes your login and everything you've saved: countries, trips, notes and your place on leaderboards. This can't be undone. Tip: use Copy my list first if you want to keep a record." }),
+    el("label", { class: "field", for: "deleteConfirm" }, "Type DELETE to confirm", delInput),
+    delBtn, delMsg);
+
   $("detail").replaceChildren(
     el("button", { type: "button", class: "back", onclick: closeDetail }, "← All countries"),
     el("div", { class: "d-head" }, el("span", { class: "code", text: session.user.email || "" }), el("h2", { text: "Your profile" })),
-    form);
+    form, danger);
   input.focus();
 }
 $("profileBtn").onclick = openProfile;

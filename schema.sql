@@ -66,3 +66,23 @@ $$;
 -- Only signed-in users may call it.
 revoke all on function public.my_travel_stats() from public, anon;
 grant execute on function public.my_travel_stats() to authenticated;
+
+-- Account deletion (also available on its own as delete-account.sql)
+create or replace function public.delete_my_account()
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if auth.uid() is null then
+    raise exception 'Not signed in';
+  end if;
+  delete from public.visits   where user_id = auth.uid();
+  delete from public.profiles where user_id = auth.uid();
+  delete from auth.users      where id      = auth.uid();
+end;
+$$;
+
+revoke all on function public.delete_my_account() from public, anon;
+grant execute on function public.delete_my_account() to authenticated;
