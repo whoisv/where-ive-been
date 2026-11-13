@@ -68,6 +68,7 @@ window.COUNTRY_FACTS = {
   GD: ["St. George's", "St. George's, Grenada", "East Caribbean dollar (XCD)", "Parliamentary constitutional monarchy", "Christianity", "English"],
   GE: ["Tbilisi", "", "Lari (GEL)", "Parliamentary republic", "Christianity (Georgian Orthodox)", "Georgian"],
   GH: ["Accra", "", "Cedi (GHS)", "Presidential republic", "Christianity", "English"],
+  GL: ["Nuuk", "", "Danish krone (DKK)", "Self-governing territory within the Kingdom of Denmark (parliamentary)", "Christianity (Lutheran)", "Greenlandic, Danish"],
   GM: ["Banjul", "", "Dalasi (GMD)", "Presidential republic", "Islam (Sunni)", "English"],
   GN: ["Conakry", "", "Guinean franc (GNF)", "Presidential republic", "Islam (Sunni)", "French"],
   GQ: ["Malabo", "", "Central African CFA franc (XAF)", "Presidential republic", "Christianity (Catholic)", "Spanish, French, Portuguese"],

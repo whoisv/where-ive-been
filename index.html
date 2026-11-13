@@ -330,7 +330,7 @@ textarea { min-height: 120px; resize: vertical; line-height: 1.5; }
 "use strict";
 
 /* Bump on every change so it's easy to see which version is live. */
-const APP_VERSION = "v1.5 · Nov 12, 2026";
+const APP_VERSION = "v1.6 · Nov 12, 2026";
 
 /* ---------- Reference data ---------- */
 const CONTINENTS = {
@@ -383,7 +383,7 @@ const byCode = {};
 /* Territories light up with the country they belong to. */
 const PARENT = {};
 for (const [p, kids] of Object.entries({
-  US: "PR GU VI AS MP UM", CN: "HK MO", DK: "GL FO",
+  US: "PR GU VI AS MP UM", CN: "HK MO", DK: "FO",
   FR: "PF NC GF GP MQ RE YT BL MF PM WF TF", GB: "GI BM KY VG AI TC MS FK IM JE GG SH IO GS PN",
   NL: "AW CW SX BQ", NO: "SJ BV", AU: "CX CC NF HM", NZ: "CK NU TK", FI: "AX", SO: "SOL XS", CY: "XC"
 })) kids.split(" ").forEach(k => PARENT[k] = p);
