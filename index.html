@@ -225,6 +225,7 @@ textarea { min-height: 120px; resize: vertical; line-height: 1.5; }
 .lb .sc { font-family: var(--font-mono); font-size: 13px; text-align: right; font-variant-numeric: tabular-nums; }
 .lb .sc small { display: block; font-size: 11px; color: var(--muted); }
 .ver { position: absolute; right: 12px; bottom: 10px; font-family: var(--font-mono); font-size: 11px; color: var(--muted); background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 2px 7px; }
+.check-icon { width: 52px; height: 52px; border-radius: 50%; display: grid; place-items: center; font-size: 26px; background: var(--accent-soft); color: var(--accent); }
 .toast { position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); background: var(--ink); color: var(--bg); padding: 8px 14px; border-radius: 8px; font-size: 13px; opacity: 0; pointer-events: none; transition: opacity .2s; }
 .toast.show { opacity: 1; }
 
@@ -306,6 +307,15 @@ textarea { min-height: 120px; resize: vertical; line-height: 1.5; }
           </div>
           <p class="hint" id="authMsg" aria-live="polite"></p>
         </form>
+        <div class="sec" id="checkEmail" hidden>
+          <div class="check-icon" aria-hidden="true">✉</div>
+          <div class="d-head"><h2>Check your email</h2></div>
+          <p class="about">We sent a confirmation link to <b id="checkEmailAddr"></b>. Click the link in that email to activate your account. It brings you straight back here, signed in.</p>
+          <p class="hint">Not there after a minute or two? Check your spam or junk folder. The email comes from Supabase Auth.</p>
+          <button type="button" class="visit-btn" id="resendBtn">Resend email</button>
+          <p class="hint" id="resendMsg" aria-live="polite"></p>
+          <button type="button" class="linkbtn" id="backToSignIn" style="justify-self:start">Back to sign in</button>
+        </div>
         <div class="sec" id="setupMsg" hidden>
           <div class="d-head"><h2>Almost ready</h2></div>
           <p class="hint">This app isn't connected to its database yet. Open <b>config.js</b> and paste in your Supabase project URL and anon key, as described in the README.</p>
@@ -330,7 +340,7 @@ textarea { min-height: 120px; resize: vertical; line-height: 1.5; }
 "use strict";
 
 /* Bump on every change so it's easy to see which version is live. */
-const APP_VERSION = "v1.6 · Nov 12, 2026";
+const APP_VERSION = "v1.7 · Nov 12, 2026";
 
 /* ---------- Reference data ---------- */
 const CONTINENTS = {
@@ -631,6 +641,8 @@ function showView(v) {
 function authMsg(text, bad) { const m = $("authMsg"); m.textContent = text; m.style.color = bad ? "var(--danger)" : ""; }
 function setAuthMode(m) {
   authMode = m;
+  $("checkEmail").hidden = true;
+  $("authForm").hidden = false;
   $("authTitle").textContent = m === "signup" ? "Create your account" : m === "reset" ? "Set a new password" : "Sign in to your travel map";
   $("authLead").textContent = m === "reset" ? "Choose a new password for your account."
     : "Mark the countries you've visited and keep notes on every trip. Your map is private to you.";
@@ -652,7 +664,11 @@ $("authForm").addEventListener("submit", async e => {
   e.preventDefault();
   if (!sb) return;
   const email = $("email").value.trim(), password = $("password").value;
-  const btn = $("authSubmit"); btn.disabled = true;
+  const btn = $("authSubmit");
+  if (btn.disabled) return;
+  const label = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = authMode === "signup" ? "Creating account…" : authMode === "reset" ? "Saving…" : "Signing in…";
   try {
     if (authMode === "reset") {
       const { error } = await sb.auth.updateUser({ password });
@@ -662,15 +678,53 @@ $("authForm").addEventListener("submit", async e => {
     } else if (authMode === "signup") {
       const { data, error } = await sb.auth.signUp({ email, password, options: { emailRedirectTo: redirectUrl(), data: { screen_name: $("screenName").value.trim().slice(0, 30), ...homeData($("homeCountry"), $("homeState")) } } });
       if (error) throw error;
-      if (!data.session) authMsg("Almost there. Check your email for a confirmation link, then come back and sign in.");
+      if (!data.session) showCheckEmail(email);
     } else {
       const { error } = await sb.auth.signInWithPassword({ email, password });
       if (error) throw error;
     }
   } catch (err) {
     authMsg((err && err.message) || "Something went wrong. Try again.", true);
-  } finally { btn.disabled = false; }
+  } finally { btn.disabled = false; btn.textContent = label; }
 });
+
+/* "Check your email" screen after sign-up */
+let resendTimer = null;
+function showCheckEmail(email) {
+  $("authForm").hidden = true;
+  $("checkEmail").hidden = false;
+  $("checkEmailAddr").textContent = email;
+  $("resendMsg").textContent = "";
+  $("checkEmail").dataset.email = email;
+  startResendCooldown(60);
+}
+function startResendCooldown(sec) {
+  const b = $("resendBtn");
+  clearInterval(resendTimer);
+  let left = sec;
+  const tick = () => {
+    if (left <= 0) { clearInterval(resendTimer); b.disabled = false; b.textContent = "Resend email"; return; }
+    b.disabled = true; b.textContent = `Resend email (${left}s)`; left--;
+  };
+  tick();
+  resendTimer = setInterval(tick, 1000);
+}
+$("resendBtn").onclick = async () => {
+  const email = $("checkEmail").dataset.email;
+  if (!sb || !email) return;
+  $("resendBtn").disabled = true;
+  const { error } = await sb.auth.resend({ type: "signup", email, options: { emailRedirectTo: redirectUrl() } });
+  const m = $("resendMsg");
+  if (error) { m.textContent = error.message || "Couldn't resend. Try again in a minute."; m.style.color = "var(--danger)"; $("resendBtn").disabled = false; return; }
+  m.textContent = `Sent again to ${email}.`; m.style.color = "";
+  startResendCooldown(60);
+};
+$("backToSignIn").onclick = () => {
+  clearInterval(resendTimer);
+  $("checkEmail").hidden = true;
+  $("authForm").hidden = false;
+  setAuthMode("signin");
+};
 $("authSwitch").onclick = () => setAuthMode(authMode === "signup" ? "signin" : "signup");
 $("forgotBtn").onclick = async () => {
   const email = $("email").value.trim();
