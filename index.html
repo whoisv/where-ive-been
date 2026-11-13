@@ -224,6 +224,7 @@ textarea { min-height: 120px; resize: vertical; line-height: 1.5; }
 .lb .who span { display: block; font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .lb .sc { font-family: var(--font-mono); font-size: 13px; text-align: right; font-variant-numeric: tabular-nums; }
 .lb .sc small { display: block; font-size: 11px; color: var(--muted); }
+.ver { position: absolute; right: 12px; bottom: 10px; font-family: var(--font-mono); font-size: 11px; color: var(--muted); background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 2px 7px; }
 .toast { position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); background: var(--ink); color: var(--bg); padding: 8px 14px; border-radius: 8px; font-size: 13px; opacity: 0; pointer-events: none; transition: opacity .2s; }
 .toast.show { opacity: 1; }
 
@@ -256,6 +257,7 @@ textarea { min-height: 120px; resize: vertical; line-height: 1.5; }
       <span>Bright = visited · pale = not yet</span>
     </div>
     <div class="tooltip" id="tip"></div>
+    <div class="ver" id="appVersion"></div>
   </div>
 
   <aside class="panel">
@@ -326,6 +328,9 @@ textarea { min-height: 120px; resize: vertical; line-height: 1.5; }
 <script>
 (() => {
 "use strict";
+
+/* Bump on every change so it's easy to see which version is live. */
+const APP_VERSION = "v1.3 · Nov 12, 2026";
 
 /* ---------- Reference data ---------- */
 const CONTINENTS = {
@@ -1356,6 +1361,7 @@ $("copyBtn").addEventListener("click", async () => {
 });
 
 /* ---------- Wiring ---------- */
+$("appVersion").textContent = APP_VERSION;
 $("search").addEventListener("input", renderList);
 function setTab(t) {
   tab = t;
