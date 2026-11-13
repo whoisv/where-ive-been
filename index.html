@@ -296,6 +296,11 @@ textarea { min-height: 120px; resize: vertical; line-height: 1.5; }
             <label class="field" for="homeState">State / province <span style="text-transform:none;letter-spacing:0">(optional)</span>
               <input id="homeState" type="text" maxlength="60" autocomplete="address-level1" list="usStates"></label>
             <p class="hint" id="homeCont"></p>
+            <div style="display:flex;gap:10px;align-items:flex-start">
+              <input type="checkbox" id="signupPublic" style="width:18px;height:18px;accent-color:var(--accent);margin:2px 0 0">
+              <label for="signupPublic" style="cursor:pointer;font-size:14.5px;color:var(--ink)"><b>Make my travel profile public</b><br>
+                <span class="hint">Other travelers see you on leaderboards and in comparisons, by screen name, home and country counts. Never your email, trips or notes. You can change this anytime in Profile.</span></label>
+            </div>
           </div>
           <label class="field" for="password">Password
             <input id="password" type="password" autocomplete="current-password" minlength="6" required></label>
@@ -340,7 +345,7 @@ textarea { min-height: 120px; resize: vertical; line-height: 1.5; }
 "use strict";
 
 /* Bump on every change so it's easy to see which version is live. */
-const APP_VERSION = "v1.7 · Nov 12, 2026";
+const APP_VERSION = "v1.8 · Nov 12, 2026";
 
 /* ---------- Reference data ---------- */
 const CONTINENTS = {
@@ -560,7 +565,7 @@ async function loadProfile() {
     home_country_name: typeof meta.home_country_name === "string" ? meta.home_country_name : "",
     home_state: typeof meta.home_state === "string" ? meta.home_state.slice(0, 60) : "",
     home_continent: typeof meta.home_continent === "string" ? meta.home_continent : "",
-    is_public: false
+    is_public: meta.is_public === true && typeof meta.screen_name === "string" && meta.screen_name.trim() !== ""
   };
   const ins = await sb.from("profiles").insert(row).select().maybeSingle();
   myProfile = ins.error ? null : (ins.data || row);
@@ -612,8 +617,8 @@ function renderBoard() {
   }
   if (!myProfile.is_public) {
     ul.append(el("li", { class: "board-note", style: "display:block" },
-      "You're not on the leaderboards. ",
-      el("button", { type: "button", class: "linkbtn", onclick: openProfile }, "Turn it on in Profile"),
+      "Your profile is private, so you're not shown here. ",
+      el("button", { type: "button", class: "linkbtn", onclick: openProfile }, "Make it public in Profile"),
       " to appear by screen name. Your email, trips and notes are never shown."));
   }
   const c = boardCache[boardMode];
@@ -676,7 +681,14 @@ $("authForm").addEventListener("submit", async e => {
       authMsg("Password updated. You're signed in.");
       loadRecords();
     } else if (authMode === "signup") {
-      const { data, error } = await sb.auth.signUp({ email, password, options: { emailRedirectTo: redirectUrl(), data: { screen_name: $("screenName").value.trim().slice(0, 30), ...homeData($("homeCountry"), $("homeState")) } } });
+      const wantsPublic = $("signupPublic").checked;
+      const screen = $("screenName").value.trim().slice(0, 30);
+      if (wantsPublic && !screen) {
+        authMsg("Choose a screen name to make your profile public, so others never see your email.", true);
+        $("screenName").focus();
+        return;
+      }
+      const { data, error } = await sb.auth.signUp({ email, password, options: { emailRedirectTo: redirectUrl(), data: { screen_name: screen, ...homeData($("homeCountry"), $("homeState")), is_public: wantsPublic } } });
       if (error) throw error;
       if (!data.session) showCheckEmail(email);
     } else {
@@ -753,8 +765,8 @@ function openProfile() {
   const pub = el("input", { type: "checkbox", id: "profilePublic", checked: !!(myProfile && myProfile.is_public), style: "width:18px;height:18px;accent-color:var(--accent);margin:0" });
   const pubRow = el("div", { style: "display:flex;gap:10px;align-items:flex-start" }, pub,
     el("label", { for: "profilePublic", style: "cursor:pointer;font-size:14.5px;text-transform:none;letter-spacing:0;color:var(--ink)" },
-      el("b", { text: "Show me on leaderboards" }), el("br"),
-      el("span", { class: "hint", text: "Others see your screen name, home and country counts. Never your email, trips or notes." })));
+      el("b", { text: "Make my travel profile public" }), el("br"),
+      el("span", { class: "hint", text: "Other travelers see you on leaderboards and in comparisons, by screen name, home and country counts. Never your email, trips or notes." })));
   const form = el("form", { class: "sec", novalidate: true },
     el("label", { class: "field", for: "profileName" }, "Screen name", input),
     el("p", { class: "hint", text: `Shown instead of your email. Leave it blank to use ${session.user.email || "your email"}.` }),
@@ -772,7 +784,7 @@ function openProfile() {
     msg.textContent = ""; msg.style.color = "";
     const name = input.value.trim().slice(0, 30);
     if (pub.checked && !name) {
-      msg.textContent = "Choose a screen name first, so you appear on leaderboards without your email.";
+      msg.textContent = "Choose a screen name first, so others never see your email.";
       msg.style.color = "var(--danger)"; input.focus(); return;
     }
     save.disabled = true; save.textContent = "Saving…";
@@ -789,13 +801,13 @@ function openProfile() {
         return;
       }
       // 2. Account details (screen name shown in the status line)
-      const acct = await withTimeout(sb.auth.updateUser({ data: { screen_name: name, ...home } }), 15000);
+      const acct = await withTimeout(sb.auth.updateUser({ data: { screen_name: name, ...home, is_public: pub.checked } }), 15000);
       if (acct.data && acct.data.user && session) session = { ...session, user: acct.data.user };
       setStatus("ok", signedInText());
       const homeTxt = homeText((session && session.user.user_metadata) || {});
       msg.textContent = pub.checked
-        ? `Saved. You're on the leaderboards as ${name}${homeTxt ? ", from " + homeTxt : ""}.`
-        : "Saved. You're hidden from leaderboards.";
+        ? `Saved. Your profile is public as ${name}${homeTxt ? ", from " + homeTxt : ""}.`
+        : "Saved. Your profile is private.";
       if (acct.error) msg.textContent += " (Your name in the status line will update after you refresh.)";
       if (tab === "board") renderList();
     } catch (err) {
