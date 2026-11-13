@@ -8,7 +8,7 @@ Where I've Been: a static travel-map app (index.html + config.js + countries-dat
 - Other territories count toward their parent country (Hong Kong/Macau → China, Puerto Rico/Guam → US, etc.). See `PARENT` in index.html.
 - United States is listed first in the home-country dropdown.
 - Antarctica is included as its own continent.
-- One opt-in switch, "Make my travel profile public" (`profiles.is_public`, off by default), gates every feature that shows a user to others: leaderboards now, comparisons and similar later. Public users appear by screen name only; never email, trips or notes.
+- One opt-in switch, "Join the traveler community" (`profiles.is_public`, off by default), gates every feature that shows a user to others: leaderboards now, comparisons and similar later. Members appear by screen name only; never email, trips or notes.
 
 ## Working rules
 - Bump `APP_VERSION` in index.html on every change; the owner checks the map corner to confirm a deploy.

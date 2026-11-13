@@ -298,8 +298,8 @@ textarea { min-height: 120px; resize: vertical; line-height: 1.5; }
             <p class="hint" id="homeCont"></p>
             <div style="display:flex;gap:10px;align-items:flex-start">
               <input type="checkbox" id="signupPublic" style="width:18px;height:18px;accent-color:var(--accent);margin:2px 0 0">
-              <label for="signupPublic" style="cursor:pointer;font-size:14.5px;color:var(--ink)"><b>Make my travel profile public</b><br>
-                <span class="hint">Other travelers see you on leaderboards and in comparisons, by screen name, home and country counts. Never your email, trips or notes. You can change this anytime in Profile.</span></label>
+              <label for="signupPublic" style="cursor:pointer;font-size:14.5px;color:var(--ink)"><b>Join the traveler community</b><br>
+                <span class="hint">Compare your travels with others on leaderboards and more, by screen name, home and country counts. Your email, trips and notes stay private. You can change this anytime in Profile.</span></label>
             </div>
           </div>
           <label class="field" for="password">Password
@@ -345,7 +345,7 @@ textarea { min-height: 120px; resize: vertical; line-height: 1.5; }
 "use strict";
 
 /* Bump on every change so it's easy to see which version is live. */
-const APP_VERSION = "v1.8 · Nov 12, 2026";
+const APP_VERSION = "v1.9 · Nov 12, 2026";
 
 /* ---------- Reference data ---------- */
 const CONTINENTS = {
@@ -617,8 +617,8 @@ function renderBoard() {
   }
   if (!myProfile.is_public) {
     ul.append(el("li", { class: "board-note", style: "display:block" },
-      "Your profile is private, so you're not shown here. ",
-      el("button", { type: "button", class: "linkbtn", onclick: openProfile }, "Make it public in Profile"),
+      "You haven't joined the traveler community, so you're not shown here. ",
+      el("button", { type: "button", class: "linkbtn", onclick: openProfile }, "Join in Profile"),
       " to appear by screen name. Your email, trips and notes are never shown."));
   }
   const c = boardCache[boardMode];
@@ -684,7 +684,7 @@ $("authForm").addEventListener("submit", async e => {
       const wantsPublic = $("signupPublic").checked;
       const screen = $("screenName").value.trim().slice(0, 30);
       if (wantsPublic && !screen) {
-        authMsg("Choose a screen name to make your profile public, so others never see your email.", true);
+        authMsg("Choose a screen name to join the traveler community, so others never see your email.", true);
         $("screenName").focus();
         return;
       }
@@ -765,8 +765,8 @@ function openProfile() {
   const pub = el("input", { type: "checkbox", id: "profilePublic", checked: !!(myProfile && myProfile.is_public), style: "width:18px;height:18px;accent-color:var(--accent);margin:0" });
   const pubRow = el("div", { style: "display:flex;gap:10px;align-items:flex-start" }, pub,
     el("label", { for: "profilePublic", style: "cursor:pointer;font-size:14.5px;text-transform:none;letter-spacing:0;color:var(--ink)" },
-      el("b", { text: "Make my travel profile public" }), el("br"),
-      el("span", { class: "hint", text: "Other travelers see you on leaderboards and in comparisons, by screen name, home and country counts. Never your email, trips or notes." })));
+      el("b", { text: "Join the traveler community" }), el("br"),
+      el("span", { class: "hint", text: "Compare your travels with others on leaderboards and more, by screen name, home and country counts. Your email, trips and notes stay private." })));
   const form = el("form", { class: "sec", novalidate: true },
     el("label", { class: "field", for: "profileName" }, "Screen name", input),
     el("p", { class: "hint", text: `Shown instead of your email. Leave it blank to use ${session.user.email || "your email"}.` }),
@@ -806,8 +806,8 @@ function openProfile() {
       setStatus("ok", signedInText());
       const homeTxt = homeText((session && session.user.user_metadata) || {});
       msg.textContent = pub.checked
-        ? `Saved. Your profile is public as ${name}${homeTxt ? ", from " + homeTxt : ""}.`
-        : "Saved. Your profile is private.";
+        ? `Saved. You're in the traveler community as ${name}${homeTxt ? ", from " + homeTxt : ""}.`
+        : "Saved. You're not in the traveler community. Your map is private.";
       if (acct.error) msg.textContent += " (Your name in the status line will update after you refresh.)";
       if (tab === "board") renderList();
     } catch (err) {
