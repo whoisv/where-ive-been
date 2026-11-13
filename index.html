@@ -688,8 +688,9 @@ function openProfile() {
   const hs = el("input", { type: "text", id: "profileState", maxlength: "60", autocomplete: "address-level1", list: "usStates" });
   const hcont = el("p", { class: "hint" });
   const pub = el("input", { type: "checkbox", id: "profilePublic", checked: !!(myProfile && myProfile.is_public), style: "width:18px;height:18px;accent-color:var(--accent);margin:0" });
-  const pubRow = el("label", { for: "profilePublic", style: "display:flex;gap:10px;align-items:flex-start;cursor:pointer" }, pub,
-    el("span", {}, el("b", { text: "Show me on leaderboards" }), el("br"),
+  const pubRow = el("div", { style: "display:flex;gap:10px;align-items:flex-start" }, pub,
+    el("label", { for: "profilePublic", style: "cursor:pointer;font-size:14.5px;text-transform:none;letter-spacing:0;color:var(--ink)" },
+      el("b", { text: "Show me on leaderboards" }), el("br"),
       el("span", { class: "hint", text: "Others see your screen name, home and country counts. Never your email, trips or notes." })));
   const form = el("form", { class: "sec", novalidate: true },
     el("label", { class: "field", for: "profileName" }, "Screen name", input),
@@ -700,30 +701,44 @@ function openProfile() {
     pubRow,
     save, msg);
   bindHome(hc, hs, hcont, typeof meta.home_country === "string" ? meta.home_country : "", typeof meta.home_state === "string" ? meta.home_state : "");
+  const withTimeout = (promise, ms) => Promise.race([promise,
+    new Promise(resolve => setTimeout(() => resolve({ error: { message: "timeout" } }), ms))]);
   form.addEventListener("submit", async e => {
     e.preventDefault();
-    save.disabled = true; msg.textContent = ""; msg.style.color = "";
+    if (save.disabled) return;
+    msg.textContent = ""; msg.style.color = "";
     const name = input.value.trim().slice(0, 30);
     if (pub.checked && !name) {
-      save.disabled = false;
       msg.textContent = "Choose a screen name first, so you appear on leaderboards without your email.";
       msg.style.color = "var(--danger)"; input.focus(); return;
     }
-    const home = homeData(hc, hs);
-    const { error } = await sb.auth.updateUser({ data: { screen_name: name, ...home } });
-    const prof = await saveProfile({ screen_name: name, ...home, is_public: pub.checked });
-    save.disabled = false;
-    if (error) { msg.textContent = error.message || "Couldn't save. Try again."; msg.style.color = "var(--danger)"; return; }
-    if (prof.error) { msg.textContent = "Saved your name and home, but leaderboards aren't set up yet (run leaderboard.sql in Supabase)."; msg.style.color = "var(--danger)"; }
-    const { data } = await sb.auth.getSession();
-    if (data.session) session = data.session;
-    setStatus("ok", signedInText());
-    if (prof.error) return;
-    const homeTxt = homeText(session.user.user_metadata || {});
-    msg.textContent = pub.checked
-      ? `Saved. You're on the leaderboards as ${displayName()}${homeTxt ? ", from " + homeTxt : ""}.`
-      : `Saved. You're hidden from leaderboards.`;
-    if (tab === "board") renderList();
+    save.disabled = true; save.textContent = "Saving…";
+    const bad = text => { msg.textContent = text; msg.style.color = "var(--danger)"; };
+    try {
+      const home = homeData(hc, hs);
+      // 1. Leaderboard profile (the part other people see)
+      const prof = await withTimeout(saveProfile({ screen_name: name, ...home, is_public: pub.checked }), 15000);
+      if (prof.error) {
+        bad(prof.error.message === "timeout"
+          ? "Saving took too long. Check your connection and try again."
+          : "Couldn't save your leaderboard setting. If you haven't yet, run leaderboard.sql in Supabase.");
+        return;
+      }
+      // 2. Account details (screen name shown in the status line)
+      const acct = await withTimeout(sb.auth.updateUser({ data: { screen_name: name, ...home } }), 15000);
+      if (acct.data && acct.data.user && session) session = { ...session, user: acct.data.user };
+      setStatus("ok", signedInText());
+      const homeTxt = homeText((session && session.user.user_metadata) || {});
+      msg.textContent = pub.checked
+        ? `Saved. You're on the leaderboards as ${name}${homeTxt ? ", from " + homeTxt : ""}.`
+        : "Saved. You're hidden from leaderboards.";
+      if (acct.error) msg.textContent += " (Your name in the status line will update after you refresh.)";
+      if (tab === "board") renderList();
+    } catch (err) {
+      bad("Something went wrong while saving. Try again.");
+    } finally {
+      save.disabled = false; save.textContent = "Save";
+    }
   });
   $("detail").replaceChildren(
     el("button", { type: "button", class: "back", onclick: closeDetail }, "← All countries"),
