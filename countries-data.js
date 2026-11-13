@@ -142,6 +142,7 @@ window.COUNTRY_FACTS = {
   OM: ["Muscat", "", "Omani rial (OMR)", "Absolute monarchy (sultanate)", "Islam (Ibadi)", "Arabic"],
   PA: ["Panama City", "", "Balboa (PAB) and US dollar (USD)", "Presidential republic", "Christianity (Catholic)", "Spanish"],
   PE: ["Lima", "", "Sol (PEN)", "Presidential republic", "Christianity (Catholic)", "Spanish, Quechua, Aymara"],
+  PF: ["Papeete", "Papeete", "CFP franc (XPF)", "Overseas collectivity of France with its own government", "Christianity", "French, Tahitian"],
   PG: ["Port Moresby", "", "Kina (PGK)", "Parliamentary constitutional monarchy", "Christianity", "English, Tok Pisin, Hiri Motu"],
   PH: ["Manila", "", "Philippine peso (PHP)", "Presidential republic", "Christianity (Catholic)", "Filipino, English"],
   PK: ["Islamabad", "", "Pakistani rupee (PKR)", "Federal parliamentary republic", "Islam (Sunni)", "Urdu, English"],
@@ -210,5 +211,5 @@ window.COUNTRY_WIKI = {
   KR: "South Korea", KP: "North Korea", VA: "Vatican City", US: "United States", GB: "United Kingdom", BS: "The Bahamas",
   GM: "The Gambia", CZ: "Czech Republic", RU: "Russia", SY: "Syria", LA: "Laos", VN: "Vietnam", BN: "Brunei",
   MD: "Moldova", TZ: "Tanzania", BO: "Bolivia", VE: "Venezuela", IR: "Iran", TW: "Taiwan", XK: "Kosovo",
-  CV: "Cape Verde", ST: "São Tomé and Príncipe", MM: "Myanmar", TR: "Turkey", NL: "Netherlands", EH: "Western Sahara"
+  CV: "Cape Verde", PF: "French Polynesia", ST: "São Tomé and Príncipe", MM: "Myanmar", TR: "Turkey", NL: "Netherlands", EH: "Western Sahara"
 };
