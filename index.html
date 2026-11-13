@@ -872,11 +872,13 @@ function handleSession(s, event) {
   if (s && prev === s.user.id && P.mode === "cloud" && !pendingCodes().size) setStatus("ok", signedInText());
   if (event === "PASSWORD_RECOVERY") { setAuthMode("reset"); showView("auth"); return; }
   if (s) {
+    linkErrorMsg = "";
     if (prev !== s.user.id) setTimeout(loadRecords, 0);
   } else {
     records = {}; selected = null; rankInfo = null; myProfile = null; Object.keys(boardCache).forEach(k => delete boardCache[k]); P.mode = "signedout";
     setStatus(null, "Not signed in");
     setAuthMode(authMode === "reset" ? "signin" : authMode);
+    if (linkErrorMsg) authMsg(linkErrorMsg, true);
     showView("auth");
     renderSummary(); paintMap();
   }
@@ -899,11 +901,13 @@ async function initAuth() {
   const { data } = await sb.auth.getSession();
   if (!data.session) handleSession(null);
   if (linkError && !data.session) {
+    linkErrorMsg = linkError;
     showView("auth");
     authMsg(linkError, true);
   }
 }
 
+let linkErrorMsg = "";   // shown on the sign-in screen until the person signs in
 function readLinkError() {
   const h = location.hash.startsWith("#") ? location.hash.slice(1) : "";
   if (!/(^|&)error(_code)?=/.test(h)) return "";
