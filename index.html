@@ -261,6 +261,26 @@ details.more .more-body { display: grid; gap: 18px; padding: 4px 12px 14px; }
 .me-line .fe { box-shadow: none; font-size: 24px; width: auto; line-height: 1; }
 .me-line .nm { font-family: var(--font-display); font-weight: 700; font-size: 20px; line-height: 1.15; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .me-line .sub { display: block; font-family: var(--font-body); font-weight: 400; font-size: 12.5px; color: var(--muted); white-space: normal; }
+/* Check-off chips */
+.chip-hint { font-size: 12.5px; color: var(--muted); padding: 6px 8px 2px; }
+.list li.cgroup-li:hover { background: none; }
+.cgroup { border: 1px solid var(--line); border-radius: 10px; margin: 6px 0; }
+.cgroup > summary { display: grid; grid-template-columns: 12px 1fr 90px 46px; align-items: center; gap: 10px; padding: 11px 12px; cursor: pointer; list-style: none; font-weight: 600; }
+.cgroup > summary::-webkit-details-marker { display: none; }
+.cgroup > summary .swc { width: 12px; height: 12px; }
+.cgroup > summary .bar { height: 6px; border-radius: 3px; overflow: hidden; background: color-mix(in srgb, var(--cc, var(--accent)) 16%, transparent); }
+.cgroup > summary .bar i { display: block; height: 100%; background: var(--cc, var(--accent)); }
+.cgroup > summary .n { font-family: var(--font-mono); font-size: 12px; color: var(--muted); text-align: right; font-variant-numeric: tabular-nums; }
+.cgroup[open] > summary { border-bottom: 1px solid var(--line); }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; padding: 12px; }
+.chip { display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px 5px 6px; border-radius: 999px; border: 1px solid var(--line);
+  background: var(--surface); cursor: pointer; font-size: 13.5px; line-height: 1.2; transition: background .12s, border-color .12s; }
+.chip:hover:not(:disabled) { border-color: var(--cc, var(--accent)); }
+.chip .cf { width: 20px; height: 14px; object-fit: cover; border-radius: 2px; box-shadow: 0 0 0 1px rgba(0,0,0,.08); }
+.chip .cf.fe { width: auto; height: auto; box-shadow: none; font-size: 15px; }
+.chip.on { background: color-mix(in srgb, var(--cc, var(--accent)) 22%, var(--surface)); border-color: var(--cc, var(--accent)); color: var(--ink); font-weight: 600; }
+.chip .tick { font-size: 12px; color: var(--cc, var(--accent)); font-weight: 700; }
+.chip:disabled { opacity: .6; cursor: default; }
 .toast { position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); background: var(--ink); color: var(--bg); padding: 8px 14px; border-radius: 8px; font-size: 13px; opacity: 0; pointer-events: none; transition: opacity .2s; }
 .toast.show { opacity: 1; }
 
@@ -1399,7 +1419,9 @@ function renderList() {
   const q = $("search").value.trim().toLowerCase();
   let items = listCountries.filter(c => !q || c.name.toLowerCase().includes(q) || c.code.toLowerCase() === q);
   if (tab === "visited") items = items.filter(c => isVisited(c.code));
-  const ul = $("list"); ul.replaceChildren();
+  const ul = $("list");
+  const keepScroll = ul.scrollTop;
+  ul.replaceChildren();
   $("tabVisited").textContent = `Visited (${listCountries.filter(c => isVisited(c.code)).length})`;
 
   if (!items.length) {
@@ -1409,6 +1431,7 @@ function renderList() {
         : "No country matches that search."));
     return;
   }
+  if (tab === "all") { renderChips(ul, items, q); ul.scrollTop = keepScroll; return; }
   for (const c of items) {
     const r = rec(c.code);
     const fd = firstDate(r);
@@ -1419,6 +1442,39 @@ function renderList() {
       el("button", { type: "button", class: "name cont-" + (contOf[c.code] || "XX"), onclick: () => openDetail(c.code, true) },
         el("i", { class: "swc", style: "margin-right:8px;vertical-align:1px" }), c.name, tab === "all" ? el("small", { text: contName(c.code) }) : null),
       el("span", { class: "meta", text: tab === "visited" ? (fd ? fd.slice(0, 7) : (r.trips.length ? "" : "")) : "" })));
+  }
+}
+
+/* "Check off countries": continents fold open; countries are tap-to-toggle chips. */
+const openConts = new Set();
+const CONT_ORDER = ["EU", "AS", "AF", "NA", "SA", "OC", "AN"];
+function chip(c) {
+  const on = isVisited(c.code);
+  const flag = el("img", { class: "cf", alt: "", loading: "lazy", src: `https://flagcdn.com/w40/${c.code.toLowerCase()}.png` });
+  flag.addEventListener("error", () => flag.replaceWith(el("span", { class: "cf fe", "aria-hidden": "true", text: flagEmoji(c.code) })));
+  return el("button", { type: "button", class: "chip cont-" + (contOf[c.code] || "XX") + (on ? " on" : ""),
+    "aria-pressed": String(on), disabled: !canEdit(), title: on ? `${c.name}: visited (tap to undo)` : `Mark ${c.name} as visited`,
+    onclick: () => setVisited(c.code, !isVisited(c.code)) },
+    flag, el("span", { text: c.name }), on ? el("span", { class: "tick", "aria-hidden": "true", text: "✓" }) : null);
+}
+function renderChips(ul, items, q) {
+  ul.append(el("li", { class: "chip-hint", style: "display:block", text: q
+    ? "Tap a country to mark it visited."
+    : "Open a continent and tap the countries you've visited. Tap again to undo." }));
+  const groups = CONT_ORDER.concat(["XX"]).map(k => ({ k, list: items.filter(c => (contOf[c.code] || "XX") === k) })).filter(g => g.list.length);
+  for (const g of groups) {
+    const all = listCountries.filter(c => (contOf[c.code] || "XX") === g.k);
+    const v = all.filter(c => isVisited(c.code)).length;
+    const d = el("details", { class: "cgroup cont-" + g.k },
+      el("summary", {},
+        el("i", { class: "swc" }),
+        el("span", { class: "cn", text: g.k === "XX" ? "Other" : CONTINENTS[g.k][0] }),
+        el("span", { class: "bar" }, el("i", { style: `width:${all.length ? (100 * v / all.length).toFixed(1) : 0}%` })),
+        el("span", { class: "n", text: `${v}/${all.length}` })),
+      el("div", { class: "chips" }, ...g.list.map(chip)));
+    d.open = !!q || openConts.has(g.k);
+    d.addEventListener("toggle", () => { if (q) return; if (d.open) openConts.add(g.k); else openConts.delete(g.k); });
+    ul.append(el("li", { class: "cgroup-li", style: "display:block;padding:0" }, d));
   }
 }
 

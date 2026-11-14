@@ -8,6 +8,7 @@ Releases of Where I've Been. Each release is one production deploy; the version 
 - Name line at the top of the panel: home-country flag, screen name, home, and "traveling since" once a year is entered.
 - Your home country is marked as visited automatically.
 - "Days on the road" and "countries this year" tiles only appear once you've entered years or dated trips.
+- "Check off countries" redesigned: continents fold open, and countries are flag chips you tap to mark visited.
 - Headline no longer shows the logged-trip count ("1 trip"), which read as if only one trip had been taken.
 - Fix: after setting a new password, go straight to the map instead of staying on the reset screen.
 
