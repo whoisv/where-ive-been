@@ -303,11 +303,12 @@ as $$
   with yr as (select to_char(now(), 'YYYY') as y),
   v as (
     select vi.user_id, vi.country_code, coalesce(cc.continent, '') as continent,
-           exists (
+           (vi.first_year::text = (select y from yr)
+            or exists (
              select 1 from jsonb_array_elements(case when jsonb_typeof(vi.trips) = 'array' then vi.trips else '[]'::jsonb end) t
              where coalesce(t ->> 'from', '') like (select y from yr) || '%'
                 or coalesce(t ->> 'to', '')   like (select y from yr) || '%'
-           ) as this_year
+           )) as this_year
     from public.visits vi
     left join public.country_continents cc on cc.code = vi.country_code
     where vi.visited

@@ -65,6 +65,7 @@ flowchart LR
 | `countries-data.js` | Facts that rarely change, for about 200 countries: capital, currency, government, main religion, languages |
 | `schema.sql` | Creates the `visits` table, its security rules and the ranking function. Run once. |
 | `stats.sql` | The ranking function on its own, for databases set up before rankings were added |
+| `add-first-year.sql` | Adds the optional "Year first visited" column and updates the this-year leaderboard. Run once. |
 | `delete-account.sql` | Lets users delete their own account and all their data from Profile. Run once. |
 | `leaderboard.sql` | Public profiles (opt-in), the country-to-continent table, the `leaderboard()` function and percentile. Run once. |
 

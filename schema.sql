@@ -8,6 +8,7 @@ create table if not exists public.visits (
   visited      boolean     not null default false,
   trips        jsonb       not null default '[]'::jsonb check (jsonb_typeof(trips) = 'array'),
   notes        text        not null default '' check (char_length(notes) <= 5000),
+  first_year   smallint    check (first_year is null or first_year between 1900 and 2100),
   updated_at   timestamptz not null default now(),
   primary key (user_id, country_code)
 );

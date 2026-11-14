@@ -250,6 +250,12 @@ textarea { min-height: 120px; resize: vertical; line-height: 1.5; }
 .badge .prog { height: 5px; border-radius: 3px; background: var(--line); margin-top: 6px; overflow: hidden; }
 .badge .prog i { display: block; height: 100%; background: var(--accent); }
 .badge.earned { border-color: color-mix(in srgb, var(--cc, var(--accent)) 50%, var(--line)); }
+details.more { border: 1px solid var(--line); border-radius: 10px; }
+details.more > summary { cursor: pointer; padding: 10px 12px; font-weight: 600; color: var(--accent); list-style: none; }
+details.more > summary::-webkit-details-marker { display: none; }
+details.more > summary::before { content: "▸ "; }
+details.more[open] > summary::before { content: "▾ "; }
+details.more .more-body { display: grid; gap: 18px; padding: 4px 12px 14px; }
 .toast { position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); background: var(--ink); color: var(--bg); padding: 8px 14px; border-radius: 8px; font-size: 13px; opacity: 0; pointer-events: none; transition: opacity .2s; }
 .toast.show { opacity: 1; }
 
@@ -443,20 +449,24 @@ let records = {};            // code -> {visited, trips:[{id,from,to,note}], not
 let selected = null;
 let tab = "all";
 
-const blank = () => ({ visited: false, trips: [], notes: "" });
+const blank = () => ({ visited: false, trips: [], notes: "", firstYear: null });
 const rec = code => records[code] || blank();
 const isVisited = code => !!(records[code] && records[code].visited);
-const isEmptyRec = r => !r.visited && !r.trips.length && !r.notes.trim();
+const isEmptyRec = r => !r.visited && !r.trips.length && !r.notes.trim() && !r.firstYear;
 function firstDate(r) {
-  const ds = r.trips.map(t => t.from || t.to).filter(isDate).sort();
-  return ds[0] || "";
+  const ds = r.trips.map(t => t.from || t.to).filter(isDate);
+  if (r.firstYear) ds.push(String(r.firstYear));
+  return ds.sort()[0] || "";
 }
+const THIS_YEAR = new Date().getFullYear();
+const validYear = v => { const n = parseInt(v, 10); return n >= 1900 && n <= THIS_YEAR + 1 ? n : null; };
 function sanitize(d) {
   return {
     visited: !!d.visited,
     trips: Array.isArray(d.trips) ? d.trips.filter(t => t && typeof t === "object").slice(0, 200)
       .map(t => ({ id: str(t.id) || rid(), from: isDate(t.from) ? t.from : "", to: isDate(t.to) ? t.to : "", note: str(t.note) })) : [],
-    notes: str(d.notes)
+    notes: str(d.notes),
+    firstYear: validYear(d.first_year != null ? d.first_year : d.firstYear)
   };
 }
 
@@ -486,6 +496,19 @@ function persist(code, immediate) {
   P.timers.set(code, setTimeout(() => { P.timers.delete(code); flush(code); }, immediate ? 0 : 700));
   setStatus("busy", "Saving…");
 }
+async function upsertVisit(code, r) {
+  const row = { user_id: session.user.id, country_code: code, visited: r.visited,
+    trips: r.trips, notes: r.notes, updated_at: new Date().toISOString() };
+  if (!P.noYearColumn) row.first_year = r.firstYear || null;
+  let res = await sb.from("visits").upsert(row, { onConflict: "user_id,country_code" });
+  if (res.error && /first_year/i.test(res.error.message || "")) {
+    // The database hasn't had add-first-year.sql yet: save everything else.
+    P.noYearColumn = true;
+    delete row.first_year;
+    res = await sb.from("visits").upsert(row, { onConflict: "user_id,country_code" });
+  }
+  return res;
+}
 async function flush(code, retried) {
   if (P.inflight.has(code)) { P.dirty.add(code); return; }
   P.inflight.add(code);
@@ -494,10 +517,7 @@ async function flush(code, retried) {
   try {
     const res = (!r || isEmptyRec(r))
       ? await sb.from("visits").delete().eq("country_code", code)
-      : await sb.from("visits").upsert({
-          user_id: session.user.id, country_code: code, visited: r.visited,
-          trips: r.trips, notes: r.notes, updated_at: new Date().toISOString()
-        }, { onConflict: "user_id,country_code" });
+      : await upsertVisit(code, r);
     if (res.error) throw res.error;
     if (!P.timers.size && P.inflight.size === 1 && !P.dirty.size) { setStatus("ok", signedInText()); refreshRank(1500); }
   } catch (e) {
@@ -524,7 +544,11 @@ function refreshRank(delay) {
 
 async function loadRecords() {
   setStatus("busy", "Loading your countries…");
-  const { data, error } = await sb.from("visits").select("country_code,visited,trips,notes");
+  let { data, error } = await sb.from("visits").select("country_code,visited,trips,notes,first_year");
+  if (error && /first_year/i.test(error.message || "")) {
+    P.noYearColumn = true;
+    ({ data, error } = await sb.from("visits").select("country_code,visited,trips,notes"));
+  }
   if (error) { setStatus("warn", "Couldn't load your countries. Refresh to try again."); return; }
   records = {};
   (data || []).forEach(row => { records[row.country_code] = sanitize(row); });
@@ -1168,7 +1192,7 @@ function renderTiles(visited) {
   let days = 0;
   visited.forEach(c => rec(c.code).trips.forEach(t => { days += tripDays(t); }));
   const yr = String(new Date().getFullYear());
-  const thisYear = visited.filter(c => rec(c.code).trips.some(t => (t.from || t.to).startsWith(yr))).length;
+  const thisYear = visited.filter(c => { const r = rec(c.code); return String(r.firstYear) === yr || r.trips.some(t => (t.from || t.to).startsWith(yr)); }).length;
   const tile = (big, small, cls, title) => el("div", { class: "tile" + (cls ? " " + cls : ""), title }, el("b", { text: String(big) }), el("span", { text: small }));
   const out = [];
   if (rankInfo && rankInfo.travelers) {
@@ -1218,7 +1242,7 @@ const BADGES = [
     { id: "d30", name: "Month on the road", icon: "🗓️", desc: "30 days of trips (trips with both dates)", progress: x => [x.days, 30] },
     { id: "d100", name: "100 days abroad", icon: "🛤️", desc: "100 days of trips", progress: x => [x.days, 100] },
     { id: "regular", name: "Regular", icon: "🔁", desc: "Log 5 trips to the same country", progress: x => [x.maxTripsOneCountry, 5] },
-    { id: "bigyear", name: "Big year", icon: "🎉", desc: "Visit 5 countries in one calendar year", progress: x => [x.maxCountriesOneYear, 5] },
+    { id: "bigyear", name: "Big year", icon: "🎉", desc: "Visit 5 countries in one calendar year (trips or first-visit years)", progress: x => [x.maxCountriesOneYear, 5] },
     { id: "story", name: "Storyteller", icon: "📝", desc: "Write notes for 10 countries", progress: x => [x.withNotes, 10] }
   ]}
 ];
@@ -1233,6 +1257,7 @@ function badgeContext() {
     const r = rec(c.code);
     maxTrips = Math.max(maxTrips, r.trips.length);
     if (r.notes.trim() || r.trips.some(t => t.note.trim())) withNotes++;
+    if (r.firstYear) (years[r.firstYear] = years[r.firstYear] || new Set()).add(c.code);
     r.trips.forEach(t => {
       days += tripDays(t);
       [t.from, t.to].filter(isDate).forEach(d => { (years[d.slice(0, 4)] = years[d.slice(0, 4)] || new Set()).add(c.code); });
@@ -1380,7 +1405,7 @@ function closeDetail() {
 
 function edit(code, fn) {
   const r = rec(code);
-  const next = { visited: r.visited, trips: r.trips.map(t => ({ ...t })), notes: r.notes };
+  const next = { visited: r.visited, trips: r.trips.map(t => ({ ...t })), notes: r.notes, firstYear: r.firstYear || null };
   fn(next);
   records[code] = next;
   persist(code);
@@ -1527,6 +1552,21 @@ function renderDetail() {
           placeholder: "Cities, people, highlights", oninput: upd("note") }))));
   });
 
+  const yearInput = el("input", { type: "number", id: "firstYear", inputmode: "numeric", min: "1900", max: String(THIS_YEAR),
+    placeholder: "e.g. 1998", disabled: ro, value: r.firstYear ? String(r.firstYear) : "", style: "max-width:140px" });
+  const yearHint = el("p", { class: "hint" });
+  yearInput.addEventListener("input", () => {
+    const raw = yearInput.value.trim();
+    const y = validYear(raw);
+    if (raw && raw.length === 4 && !y) { yearHint.textContent = `Enter a year between 1900 and ${THIS_YEAR}.`; yearHint.style.color = "var(--danger)"; return; }
+    yearHint.textContent = ""; yearHint.style.color = "";
+    if (raw && raw.length < 4) return;   // wait for all four digits
+    const wasVisited = isVisited(code);
+    edit(code, n => { n.firstYear = y; if (y) n.visited = true; });
+    if (y && !wasVisited) { renderList(); toast(`${c.name} added`); }
+  });
+  if (P.noYearColumn) { yearHint.textContent = "Years can't be saved until the site owner runs add-first-year.sql in Supabase."; yearHint.style.color = "var(--danger)"; }
+
   const notes = el("textarea", { id: "notes", disabled: ro, maxlength: "5000",
     placeholder: "Favorite places, food, tips for next time…",
     oninput: e => edit(code, n => { n.notes = e.target.value; }) });
@@ -1538,8 +1578,12 @@ function renderDetail() {
     el("button", { type: "button", class: "visit-btn" + (r.visited ? " on" : ""), disabled: ro, "aria-pressed": String(r.visited),
       onclick: () => setVisited(code, !r.visited) }, r.visited ? "✓ Visited" : "Mark as visited"),
     el("section", { class: "sec" },
+      el("label", { class: "field", for: "firstYear" }, "Year first visited (optional)", yearInput),
+      yearHint),
+    moreDetails(code, r,
+    el("section", { class: "sec" },
       el("h3", { text: r.trips.length ? `Trips (${r.trips.length})` : "Trips" }),
-      r.trips.length ? tripsList : el("p", { class: "hint", text: "Add each trip with its dates. Adding a trip marks the country as visited." }),
+      r.trips.length ? tripsList : el("p", { class: "hint", text: "Log each visit with its dates, if you'd like more detailed stats. Adding a trip marks the country as visited." }),
       el("button", { type: "button", class: "add", disabled: ro,
         onclick: () => {
           const id = rid();
@@ -1547,9 +1591,22 @@ function renderDetail() {
           renderDetail(); renderList();
           const f = $(`trip-${id}-from`); if (f) f.focus();
         } }, "+ Add a trip")),
-    el("section", { class: "sec" }, el("label", { for: "notes", text: "Notes" }), notes),
+    el("section", { class: "sec" }, el("label", { for: "notes", text: "Notes" }), notes)),
     ro ? el("p", { class: "hint", text: session ? "Loading your saved countries…" : "Sign in to save countries." }) : null
   );
+}
+
+/* Trips and notes sit in a fold: open when the country already has some, or when you opened it. */
+const openFolds = new Set();
+function moreDetails(code, r, ...content) {
+  const d = el("details", { class: "more" },
+    el("summary", {}, r.trips.length || r.notes.trim()
+      ? `Trip details and notes (${r.trips.length} trip${r.trips.length === 1 ? "" : "s"}${r.notes.trim() ? ", notes" : ""})`
+      : "Add trip details and notes"),
+    el("div", { class: "more-body" }, ...content));
+  d.open = openFolds.has(code) || !!(r.trips.length || r.notes.trim());
+  d.addEventListener("toggle", () => { if (d.open) openFolds.add(code); else openFolds.delete(code); });
+  return d;
 }
 
 function renderAll() { renderSummary(); paintMap(); renderList(); renderDetail(); }
@@ -1633,7 +1690,9 @@ $("copyBtn").addEventListener("click", async () => {
   const lines = v.map(c => {
     const r = rec(c.code);
     const trips = r.trips.filter(t => t.from || t.to).map(t => [fmtDate(t.from), fmtDate(t.to)].filter(Boolean).join(" – ")).join("; ");
-    return `${c.name}${trips ? " (" + trips + ")" : ""}`;
+    const yr = r.firstYear ? `first visited ${r.firstYear}` : "";
+    const extra = [yr, trips].filter(Boolean).join("; ");
+    return `${c.name}${extra ? " (" + extra + ")" : ""}`;
   });
   const text = `Countries I've visited: ${v.length}\n\n` + lines.join("\n");
   try { await navigator.clipboard.writeText(text); toast("List copied"); }

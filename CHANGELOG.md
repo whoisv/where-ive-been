@@ -4,6 +4,7 @@ Releases of Where I've Been. Each release is one production deploy; the version 
 
 ## Pending release (on `preview`, not yet live)
 - v1.15: Badges. 22 badges in five groups (countries, continents, collections, trips, notes), a badge row on the panel, a full badge page with progress bars, and a "New badge!" pop-up.
+- "Year first visited" on each country page; trips and notes move under an optional "Add trip details and notes" section. The year counts toward "since", countries this year, the Big year badge and the this-year leaderboard. Requires add-first-year.sql.
 - Headline no longer shows the logged-trip count ("1 trip"), which read as if only one trip had been taken.
 - Fix: after setting a new password, go straight to the map instead of staying on the reset screen.
 
