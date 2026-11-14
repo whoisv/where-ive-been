@@ -230,6 +230,26 @@ textarea { min-height: 120px; resize: vertical; line-height: 1.5; }
 .danger-zone h3 { color: var(--danger); }
 .danger-btn { border-color: var(--danger); color: var(--danger); }
 .danger-btn:not(:disabled):hover { background: var(--danger); color: #fff; }
+/* Badges */
+.badge-row { display: flex; align-items: center; gap: 8px; width: 100%; padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg); cursor: pointer; text-align: left; }
+.badge-row:hover { border-color: var(--accent); }
+.badge-row .stack { display: flex; }
+.badge-row .stack .bi { width: 28px; height: 28px; font-size: 15px; margin-right: -6px; border: 2px solid var(--bg); }
+.badge-row .lbl { margin-left: 10px; font-size: 13px; color: var(--muted); }
+.badge-row .lbl b { color: var(--ink); font-family: var(--font-display); font-size: 16px; margin-right: 4px; }
+.badge-row .go { margin-left: auto; color: var(--accent); font-size: 13px; font-weight: 600; }
+.bi { width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; font-size: 22px; flex: none;
+  background: color-mix(in srgb, var(--cc, var(--accent)) 18%, var(--surface)); box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--cc, var(--accent)) 55%, transparent); }
+.badge-group h3 { margin: 6px 0 2px; }
+.badges { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.badge { display: grid; grid-template-columns: 44px 1fr; gap: 12px; align-items: center; padding: 10px; border: 1px solid var(--line); border-radius: 10px; }
+.badge b { display: block; font-size: 14.5px; }
+.badge span { display: block; font-size: 12.5px; color: var(--muted); }
+.badge.locked .bi { filter: grayscale(1); opacity: .45; }
+.badge.locked b { color: var(--muted); }
+.badge .prog { height: 5px; border-radius: 3px; background: var(--line); margin-top: 6px; overflow: hidden; }
+.badge .prog i { display: block; height: 100%; background: var(--accent); }
+.badge.earned { border-color: color-mix(in srgb, var(--cc, var(--accent)) 50%, var(--line)); }
 .toast { position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); background: var(--ink); color: var(--bg); padding: 8px 14px; border-radius: 8px; font-size: 13px; opacity: 0; pointer-events: none; transition: opacity .2s; }
 .toast.show { opacity: 1; }
 
@@ -270,6 +290,7 @@ textarea { min-height: 120px; resize: vertical; line-height: 1.5; }
       <div class="big"><strong id="count">0</strong><span id="countLabel">countries visited</span></div>
       <div class="tiles" id="tiles"></div>
       <ul class="conts" id="conts"></ul>
+      <button type="button" class="badge-row" id="badgeRow" aria-label="See all badges"></button>
       <div class="status" id="status"><span id="statusText"><i class="dot"></i>Connecting…</span><span style="display:flex;gap:12px;flex-wrap:wrap;justify-content:flex-end"><button type="button" class="linkbtn" id="importBtn">Import a list</button><button type="button" class="linkbtn" id="copyBtn">Copy my list</button><button type="button" class="linkbtn" id="profileBtn" hidden>Profile</button><button type="button" class="linkbtn" id="signOutBtn" hidden>Sign out</button></span></div>
     </div>
 
@@ -349,7 +370,7 @@ textarea { min-height: 120px; resize: vertical; line-height: 1.5; }
 "use strict";
 
 /* Bump on every change so it's easy to see which version is live. */
-const APP_VERSION = "v1.14 · Nov 12, 2026";
+const APP_VERSION = "v1.15 · Nov 13, 2026 · preview";
 
 /* ---------- Reference data ---------- */
 const CONTINENTS = {
@@ -888,7 +909,7 @@ function handleSession(s, event) {
     linkErrorMsg = "";
     if (prev !== s.user.id) setTimeout(loadRecords, 0);
   } else {
-    records = {}; selected = null; rankInfo = null; myProfile = null; Object.keys(boardCache).forEach(k => delete boardCache[k]); P.mode = "signedout";
+    records = {}; selected = null; rankInfo = null; earnedBefore = null; myProfile = null; Object.keys(boardCache).forEach(k => delete boardCache[k]); P.mode = "signedout";
     setStatus(null, "Not signed in");
     setAuthMode(authMode === "reset" ? "signin" : authMode);
     if (linkErrorMsg) authMsg(linkErrorMsg, true);
@@ -1161,6 +1182,117 @@ function renderTiles(visited) {
   box.replaceChildren(...out);
 }
 
+
+/* ---------- Badges (worked out from your own countries and trips) ---------- */
+const ISLAND_NATIONS = "IS IE GB MT CY JP PH ID LK MV SG BH TW NZ FJ CU JM BS BB TT AG DM GD KN LC VC MU SC MG CV ST KM WS TO VU SB KI TV NR MH FM PW".split(" ");
+const setBadge = (id, name, icon, cont, codes, desc) => ({ id, name, icon, cont, desc,
+  progress: x => [codes.filter(c => x.visited.has(c)).length, codes.length] });
+const BADGES = [
+  { group: "Countries", items: [
+    { id: "c1", name: "First stamp", icon: "🛂", desc: "Visit your first country", progress: x => [x.count, 1] },
+    { id: "c10", name: "Explorer", icon: "🧭", desc: "Visit 10 countries", progress: x => [x.count, 10] },
+    { id: "c25", name: "Globetrotter", icon: "🌍", desc: "Visit 25 countries", progress: x => [x.count, 25] },
+    { id: "c50", name: "Jet setter", icon: "✈️", desc: "Visit 50 countries", progress: x => [x.count, 50] },
+    { id: "c100", name: "Centurion", icon: "💯", desc: "Visit 100 countries", progress: x => [x.count, 100] },
+    { id: "c150", name: "Citizen of the world", icon: "🌐", desc: "Visit 150 countries", progress: x => [x.count, 150] }
+  ]},
+  { group: "Continents", items: [
+    { id: "k3", name: "Three continents", icon: "🗺️", desc: "Visit 3 continents", progress: x => [x.continents, 3] },
+    { id: "k5", name: "Five continents", icon: "🧳", desc: "Visit 5 continents", progress: x => [x.continents, 5] },
+    { id: "k7", name: "All seven", icon: "🏆", desc: "Visit every continent, Antarctica included", progress: x => [x.continents, 7] },
+    setBadge("polar", "Polar explorer", "🐧", "AN", ["AQ"], "Visit Antarctica")
+  ]},
+  { group: "Collections", items: [
+    setBadge("nordic", "Nordic circuit", "❄️", "EU", ["NO", "SE", "DK", "FI", "IS"], "Norway, Sweden, Denmark, Finland and Iceland"),
+    setBadge("baltic", "Baltic trio", "🌲", "EU", ["EE", "LV", "LT"], "Estonia, Latvia and Lithuania"),
+    setBadge("benelux", "Benelux", "🚲", "EU", ["BE", "NL", "LU"], "Belgium, the Netherlands and Luxembourg"),
+    setBadge("iberia", "Iberian peninsula", "☀️", "EU", ["ES", "PT"], "Spain and Portugal"),
+    setBadge("micro", "Microstate collector", "🏰", "EU", ["VA", "MC", "SM", "LI", "AD"], "Vatican City, Monaco, San Marino, Liechtenstein and Andorra"),
+    setBadge("central", "Central America", "🌋", "NA", ["BZ", "GT", "SV", "HN", "NI", "CR", "PA"], "All 7 Central American countries"),
+    { id: "islands", name: "Island hopper", icon: "🏝️", cont: "OC", desc: "Visit 10 island nations",
+      progress: x => [ISLAND_NATIONS.filter(c => x.visited.has(c)).length, 10] }
+  ]},
+  { group: "Trips", items: [
+    { id: "d30", name: "Month on the road", icon: "🗓️", desc: "30 days of trips (trips with both dates)", progress: x => [x.days, 30] },
+    { id: "d100", name: "100 days abroad", icon: "🛤️", desc: "100 days of trips", progress: x => [x.days, 100] },
+    { id: "regular", name: "Regular", icon: "🔁", desc: "Log 5 trips to the same country", progress: x => [x.maxTripsOneCountry, 5] },
+    { id: "bigyear", name: "Big year", icon: "🎉", desc: "Visit 5 countries in one calendar year", progress: x => [x.maxCountriesOneYear, 5] },
+    { id: "story", name: "Storyteller", icon: "📝", desc: "Write notes for 10 countries", progress: x => [x.withNotes, 10] }
+  ]}
+];
+const ALL_BADGES = BADGES.flatMap(g => g.items);
+
+function badgeContext() {
+  const visitedList = listCountries.filter(c => isVisited(c.code));
+  const visited = new Set(visitedList.map(c => c.code));
+  const years = {};
+  let days = 0, maxTrips = 0, withNotes = 0;
+  visitedList.forEach(c => {
+    const r = rec(c.code);
+    maxTrips = Math.max(maxTrips, r.trips.length);
+    if (r.notes.trim() || r.trips.some(t => t.note.trim())) withNotes++;
+    r.trips.forEach(t => {
+      days += tripDays(t);
+      [t.from, t.to].filter(isDate).forEach(d => { (years[d.slice(0, 4)] = years[d.slice(0, 4)] || new Set()).add(c.code); });
+    });
+  });
+  return {
+    visited, count: visited.size,
+    continents: new Set(visitedList.map(c => contOf[c.code]).filter(Boolean)).size,
+    days, maxTripsOneCountry: maxTrips, withNotes,
+    maxCountriesOneYear: Math.max(0, ...Object.values(years).map(s => s.size))
+  };
+}
+function badgeStatus() {
+  const x = badgeContext();
+  return ALL_BADGES.map(b => { const [have, need] = b.progress(x); return { b, have: Math.min(have, need), need, earned: have >= need }; });
+}
+const badgeIcon = b => el("span", { class: "bi cont-" + (b.cont || "XX"), "aria-hidden": "true", text: b.icon });
+
+let earnedBefore = null;   // badge ids earned when your data last loaded; new ones after that get a toast
+function renderBadgeRow() {
+  const row = $("badgeRow"); if (!row) return;
+  const st = badgeStatus();
+  const earned = st.filter(s => s.earned);
+  const ids = new Set(earned.map(s => s.b.id));
+  if (P.mode === "cloud") {
+    if (earnedBefore) {
+      const fresh = earned.filter(s => !earnedBefore.has(s.b.id));
+      if (fresh.length) toast(`New badge: ${fresh.map(s => s.b.icon + " " + s.b.name).join(", ")}!`);
+    }
+    earnedBefore = ids;
+  } else earnedBefore = null;
+  row.replaceChildren(
+    el("span", { class: "stack" }, ...earned.slice(-5).map(s => badgeIcon(s.b))),
+    el("span", { class: "lbl" }, el("b", { text: String(earned.length) }), `of ${ALL_BADGES.length} badges`),
+    el("span", { class: "go", text: "See all →" }));
+}
+function openBadges() {
+  selected = null; paintMap();
+  showView("detail");
+  const st = badgeStatus();
+  const byId = Object.fromEntries(st.map(s => [s.b.id, s]));
+  const earnedCount = st.filter(s => s.earned).length;
+  const groups = BADGES.map(g => el("section", { class: "sec badge-group" },
+    el("h3", { text: `${g.group} · ${g.items.filter(b => byId[b.id].earned).length}/${g.items.length}` }),
+    el("ul", { class: "badges" }, ...g.items.map(b => {
+      const s = byId[b.id];
+      return el("li", { class: "badge " + (s.earned ? "earned" : "locked") + " cont-" + (b.cont || "XX") },
+        badgeIcon(b),
+        el("div", {},
+          el("b", { text: b.name }),
+          el("span", { text: b.desc }),
+          s.earned ? null : el("div", { class: "prog", role: "img", "aria-label": `${s.have} of ${s.need}` },
+            el("i", { style: `width:${Math.round(100 * s.have / s.need)}%` })),
+          s.earned ? null : el("span", { text: `${s.have} of ${s.need}` })));
+    }))));
+  $("detail").replaceChildren(
+    el("button", { type: "button", class: "back", onclick: closeDetail }, "← All countries"),
+    el("div", { class: "d-head" }, el("h2", { text: "Your badges" }), el("span", { class: "cont", text: `${earnedCount} of ${ALL_BADGES.length} earned` })),
+    ...groups);
+}
+$("badgeRow").addEventListener("click", openBadges);
+
 /* ---------- Panel rendering ---------- */
 function renderSummary() {
   const visited = listCountries.filter(c => isVisited(c.code));
@@ -1172,6 +1304,7 @@ function renderSummary() {
   $("countLabel").replaceChildren(`of ${total} countries`, el("br"),
     el("em", { text: `${pct}% of the world · ${trips} trip${trips === 1 ? "" : "s"}${years.length ? " · since " + years[0].slice(0, 4) : ""}` }));
   renderTiles(visited);
+  renderBadgeRow();
 
   const ul = $("conts"); ul.replaceChildren();
   for (const k of ["EU", "AS", "AF", "NA", "SA", "OC", "AN"]) {
