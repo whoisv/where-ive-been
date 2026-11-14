@@ -3,11 +3,14 @@
 Releases of Where I've Been. Each release is one production deploy; the version shows in the map's bottom-right corner.
 
 ## Pending release (on `preview`, not yet live)
-- v1.16: Help & About page (Help link in the panel and on the sign-in screen; shareable at whereihavebeen.com/#help) with how-to, badges and community, common questions, privacy and contact (help@whereihavebeen.com).
+- Nothing yet.
+
+## v1.16 · Nov 13, 2026 (live)
+- Help & About page (Help link in the panel and on the sign-in screen; shareable at whereihavebeen.com/#help) with how-to, badges and community, common questions, privacy and contact (help@whereihavebeen.com).
 - Removed the "Other" group (including Northern Cyprus and Somaliland) and Kosovo: shown as plain land, not counted.
 - Continents listed in alphabetical order (panel bars, Check off countries, leaderboard choices).
 
-## v1.15 · Nov 13, 2026 (live)
+## v1.15 · Nov 13, 2026
 - Badges. 22 badges in five groups (countries, continents, collections, trips, notes), a badge row on the panel, a full badge page with progress bars, and a "New badge!" pop-up.
 - "Year first visited" on each country page; trips and notes move under an optional "Add trip details and notes" section. The year counts toward "since", countries this year, the Big year badge and the this-year leaderboard. Requires add-first-year.sql.
 - Name line at the top of the panel: home-country flag, screen name, home, and "traveling since" once a year is entered.
