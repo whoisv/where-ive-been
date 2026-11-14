@@ -1296,7 +1296,8 @@ function drawMap(geo) {
   mapW = geo.W; mapH = geo.H;
   const seen = new Set();
   // Places outside the country count (excluded places and territories) are plain, unclickable land.
-  const outside = c => EXCLUDE.has(c.code) || !!PARENT[c.code];
+  // …and anything without a continent (disputed or unrecognised regions in the map data).
+  const outside = c => EXCLUDE.has(c.code) || !!PARENT[c.code] || !contOf[c.code];
   const inert = geo.list.filter(outside);
   countries = geo.list.filter(c => !outside(c) && !seen.has(c.code) && seen.add(c.code)).sort((a, b) => a.name.localeCompare(b.name));
   countries.forEach(c => byCode[c.code] = c);
