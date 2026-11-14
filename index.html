@@ -256,6 +256,11 @@ details.more > summary::-webkit-details-marker { display: none; }
 details.more > summary::before { content: "▸ "; }
 details.more[open] > summary::before { content: "▾ "; }
 details.more .more-body { display: grid; gap: 18px; padding: 4px 12px 14px; }
+.me-line { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.me-line img, .me-line .fe { width: 30px; height: auto; border-radius: 3px; box-shadow: 0 0 0 1px var(--line); flex: none; }
+.me-line .fe { box-shadow: none; font-size: 24px; width: auto; line-height: 1; }
+.me-line .nm { font-family: var(--font-display); font-weight: 700; font-size: 20px; line-height: 1.15; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.me-line .sub { display: block; font-family: var(--font-body); font-weight: 400; font-size: 12.5px; color: var(--muted); white-space: normal; }
 .toast { position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); background: var(--ink); color: var(--bg); padding: 8px 14px; border-radius: 8px; font-size: 13px; opacity: 0; pointer-events: none; transition: opacity .2s; }
 .toast.show { opacity: 1; }
 
@@ -293,6 +298,7 @@ details.more .more-body { display: grid; gap: 18px; padding: 4px 12px 14px; }
 
   <aside class="panel">
     <div class="summary">
+      <div class="me-line" id="meLine" hidden></div>
       <div class="big"><strong id="count">0</strong><span id="countLabel">countries visited</span></div>
       <div class="tiles" id="tiles"></div>
       <ul class="conts" id="conts"></ul>
@@ -559,6 +565,8 @@ async function loadRecords() {
   if (authMode !== "reset") showView("list");
   renderAll();
   await loadProfile();
+  ensureHomeVisited();
+  renderSummary();
   if (tab === "board") { loadBoard(true); renderList(); }
 }
 
@@ -684,6 +692,42 @@ function renderBoard() {
       el("span", { class: "sc" }, String(r.score), el("small", { text: unit }))));
   });
   ul.append(el("li", { style: "display:block;padding:0" }, lb));
+}
+
+
+/* ---------- Your name line and home country ---------- */
+function homeInfo() {
+  const meta = (session && session.user.user_metadata) || {};
+  const p = myProfile || {};
+  const pick = k => (typeof p[k] === "string" && p[k]) || (typeof meta[k] === "string" && meta[k]) || "";
+  return { code: pick("home_country"), name: pick("home_country_name"), state: pick("home_state") };
+}
+function renderMeLine(sinceYear) {
+  const box = $("meLine"); if (!box) return;
+  if (!session || P.mode !== "cloud") { box.hidden = true; return; }
+  const h = homeInfo();
+  const where = [h.state, h.name].filter(Boolean).join(", ");
+  const sub = [where, sinceYear ? `traveling since ${sinceYear}` : ""].filter(Boolean).join(" · ");
+  const kids = [];
+  if (h.code && /^[A-Z]{2}$/.test(h.code)) {
+    const img = el("img", { src: `https://flagcdn.com/w80/${h.code.toLowerCase()}.png`, alt: `Flag of ${h.name || h.code}` });
+    img.addEventListener("error", () => img.replaceWith(el("span", { class: "fe", "aria-hidden": "true", text: flagEmoji(h.code) })));
+    kids.push(img);
+  }
+  kids.push(el("span", { class: "nm" }, displayName(), sub ? el("span", { class: "sub", text: sub }) : null));
+  box.replaceChildren(...kids);
+  box.hidden = false;
+}
+// Your home country counts as visited.
+function ensureHomeVisited() {
+  const raw = homeInfo().code;
+  if (!raw || !canEdit()) return;
+  const code = eff(raw);
+  if (!byCode[code] || isVisited(code)) return;
+  records[code] = { ...rec(code), visited: true };
+  persist(code, true);
+  renderSummary(); paintMap(); renderList();
+  toast(`${byCode[code].name} marked as visited (your home country)`);
 }
 
 /* ---------- Sign in / sign up ---------- */
@@ -874,6 +918,8 @@ function openProfile() {
         ? `Saved. You're in the traveler community as ${name}${homeTxt ? ", from " + homeTxt : ""}.`
         : "Saved. You're not in the traveler community. Your map is private.";
       if (acct.error) msg.textContent += " (Your name in the status line will update after you refresh.)";
+      ensureHomeVisited();
+      renderSummary();
       if (tab === "board") renderList();
     } catch (err) {
       console.error("Profile save failed", err);
@@ -1203,8 +1249,10 @@ function renderTiles(visited) {
       : tile("—", `${rankInfo.travelers} traveler${rankInfo.travelers === 1 ? "" : "s"} so far`, "rank"));
   }
   out.push(tile(`${contsVisited}/${contsTotal}`, "continents"));
-  out.push(tile(days.toLocaleString(), days === 1 ? "day on the road" : "days on the road", "", "Adds up trips that have both dates"));
-  out.push(tile(thisYear, `countries in ${yr}`));
+  // Date-based tiles appear only once someone has entered years or dated trips.
+  const hasDates = visited.some(c => { const r = rec(c.code); return r.firstYear || r.trips.some(t => isDate(t.from) || isDate(t.to)); });
+  if (hasDates) out.push(tile(thisYear, `countries in ${yr}`));
+  if (days > 0) out.push(tile(days.toLocaleString(), days === 1 ? "day on the road" : "days on the road", "", "Adds up trips that have both dates"));
   box.replaceChildren(...out);
 }
 
@@ -1329,7 +1377,8 @@ function renderSummary() {
   const total = listCountries.length;
   const pct = total ? Math.round(100 * visited.length / total) : 0;
   $("countLabel").replaceChildren(`of ${total} countries`, el("br"),
-    el("em", { text: `${pct}% of the world${years.length ? " · since " + years[0].slice(0, 4) : ""}` }));
+    el("em", { text: `${pct}% of the world` }));
+  renderMeLine(years.length ? years[0].slice(0, 4) : "");
   renderTiles(visited);
   renderBadgeRow();
 
