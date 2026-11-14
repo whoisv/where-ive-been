@@ -424,6 +424,8 @@ const CONTINENTS = {
   OC: ["Oceania", "AS AU CK FJ PF GU KI MH FM NR NC NZ NU NF MP PW PG PN WS SB TK TO TV VU WF"],
   AN: ["Antarctica", "AQ TF HM BV"]
 };
+// Continents in alphabetical order, used everywhere continents are listed
+const CONT_AZ = ["AF", "AN", "AS", "EU", "NA", "OC", "SA"];
 const contOf = {};
 for (const [k, [, list]] of Object.entries(CONTINENTS)) list.split(" ").forEach(c => contOf[c] = k);
 const contName = code => (CONTINENTS[contOf[code]] || ["Other"])[0];
@@ -690,7 +692,7 @@ function renderBoard() {
   const yr = new Date().getFullYear();
   const sel = el("select", { id: "boardSel", "aria-label": "Choose a leaderboard" });
   const opts = [["all", "Most countries · all travelers"], ["year", `Most countries visited in ${yr}`]];
-  ["Europe", "Asia", "Africa", "North America", "South America", "Oceania", "Antarctica"].forEach(n => opts.push(["continent:" + n, `Most of ${n}`]));
+  CONT_AZ.map(k => CONTINENTS[k][0]).forEach(n => opts.push(["continent:" + n, `Most of ${n}`]));
   if (myProfile && myProfile.home_country) opts.push(["home", `From ${myProfile.home_country_name || myProfile.home_country}`]);
   if (myProfile && myProfile.home_country && myProfile.home_state) opts.push(["state", `From ${myProfile.home_state}`]);
   if (!opts.some(o => o[0] === boardMode)) boardMode = "all";
@@ -1515,7 +1517,7 @@ function renderSummary() {
   renderBadgeRow();
 
   const ul = $("conts"); ul.replaceChildren();
-  for (const k of ["EU", "AS", "AF", "NA", "SA", "OC", "AN"]) {
+  for (const k of CONT_AZ) {
     const all = listCountries.filter(c => contOf[c.code] === k);
     if (!all.length) continue;
     const v = all.filter(c => isVisited(c.code)).length;
@@ -1559,7 +1561,7 @@ function renderList() {
 
 /* "Check off countries": continents fold open; countries are tap-to-toggle chips. */
 const openConts = new Set();
-const CONT_ORDER = ["EU", "AS", "AF", "NA", "SA", "OC", "AN"];
+const CONT_ORDER = CONT_AZ;
 function chip(c) {
   const on = isVisited(c.code);
   const flag = el("img", { class: "cf", alt: "", loading: "lazy", src: `https://flagcdn.com/w40/${c.code.toLowerCase()}.png` });
