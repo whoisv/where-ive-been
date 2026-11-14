@@ -5,6 +5,7 @@ Where I've Been: a static travel-map app (index.html + config.js + countries-dat
 ## Owner's decisions (keep these on every change)
 - Greenland (GL) is its own country, not folded into Denmark.
 - French Polynesia (PF) is its own entry, not folded into France.
+- French Guiana (GF) is its own entry, cut out of France's outline when the map data draws them together (`splitTerritory`).
 - Palestine (PS) is excluded from the checklist and counts; its shape stays as plain, unclickable land.
 - Other territories count toward their parent country (Hong Kong/Macau → China, Puerto Rico/Guam → US, etc.). See `PARENT` in index.html.
 - United States is listed first in the home-country dropdown.

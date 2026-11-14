@@ -67,6 +67,7 @@ window.COUNTRY_FACTS = {
   GB: ["London", "", "Pound sterling (GBP)", "Parliamentary constitutional monarchy", "Christianity; many unaffiliated", "English"],
   GD: ["St. George's", "St. George's, Grenada", "East Caribbean dollar (XCD)", "Parliamentary constitutional monarchy", "Christianity", "English"],
   GE: ["Tbilisi", "", "Lari (GEL)", "Parliamentary republic", "Christianity (Georgian Orthodox)", "Georgian"],
+  GF: ["Cayenne", "", "Euro (EUR)", "Overseas region of France", "Christianity (Catholic)", "French"],
   GH: ["Accra", "", "Cedi (GHS)", "Presidential republic", "Christianity", "English"],
   GL: ["Nuuk", "", "Danish krone (DKK)", "Self-governing territory within the Kingdom of Denmark (parliamentary)", "Christianity (Lutheran)", "Greenlandic, Danish"],
   GM: ["Banjul", "", "Dalasi (GMD)", "Presidential republic", "Islam (Sunni)", "English"],
@@ -211,5 +212,5 @@ window.COUNTRY_WIKI = {
   KR: "South Korea", KP: "North Korea", VA: "Vatican City", US: "United States", GB: "United Kingdom", BS: "The Bahamas",
   GM: "The Gambia", CZ: "Czech Republic", RU: "Russia", SY: "Syria", LA: "Laos", VN: "Vietnam", BN: "Brunei",
   MD: "Moldova", TZ: "Tanzania", BO: "Bolivia", VE: "Venezuela", IR: "Iran", TW: "Taiwan", XK: "Kosovo",
-  CV: "Cape Verde", PF: "French Polynesia", ST: "São Tomé and Príncipe", MM: "Myanmar", TR: "Turkey", NL: "Netherlands", EH: "Western Sahara"
+  CV: "Cape Verde", PF: "French Polynesia", GF: "French Guiana", ST: "São Tomé and Príncipe", MM: "Myanmar", TR: "Turkey", NL: "Netherlands", EH: "Western Sahara"
 };

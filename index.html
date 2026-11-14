@@ -456,7 +456,7 @@ const byCode = {};
 const PARENT = {};
 for (const [p, kids] of Object.entries({
   US: "PR GU VI AS MP UM", CN: "HK MO", DK: "FO",
-  FR: "NC GF GP MQ RE YT BL MF PM WF TF", GB: "GI BM KY VG AI TC MS FK IM JE GG SH IO GS PN",
+  FR: "NC GP MQ RE YT BL MF PM WF TF", GB: "GI BM KY VG AI TC MS FK IM JE GG SH IO GS PN",
   NL: "AW CW SX BQ", NO: "SJ BV", AU: "CX CC NF HM", NZ: "CK NU TK", FI: "AX", SO: "SOL XS", CY: "XC"
 })) kids.split(" ").forEach(k => PARENT[k] = p);
 const eff = code => (PARENT[code] && byCode[PARENT[code]]) ? PARENT[code] : code;
@@ -1162,8 +1162,31 @@ function addAntarctica(geo) {
   }
 }
 
+/* Some map data draws a territory inside its parent's outline (French Guiana inside France).
+   Cut the pieces near the territory out of the parent and give them their own entry. */
+function splitTerritory(geo, parent, code, name, lon, lat, radiusFrac) {
+  if (!geo.proj || geo.list.some(c => c.code === code)) return;
+  const host = geo.list.find(c => c.code === parent);
+  if (!host) return;
+  const target = geo.proj(lon, lat);
+  if (!target || !isFinite(target[0])) return;
+  const parts = host.d.split(/(?=M)/).filter(Boolean);
+  if (parts.length < 2) return;
+  const near = [], keep = [];
+  const r = geo.W * radiusFrac;
+  for (const part of parts) {
+    const m = /^M\s*(-?[\d.]+)[ ,]+(-?[\d.]+)/.exec(part);
+    const x = m ? +m[1] : NaN, y = m ? +m[2] : NaN;
+    (Math.hypot(x - target[0], y - target[1]) < r ? near : keep).push(part);
+  }
+  if (!near.length || !keep.length) return;
+  host.d = keep.join("");
+  geo.list.push({ code, name, d: near.join("") });
+}
+
 function addSmall(geo) {
   addAntarctica(geo);
+  splitTerritory(geo, "FR", "GF", "French Guiana", -53.1, 3.9, 0.04);
   if (!geo.proj) return;
   const have = new Set(geo.list.map(c => c.code));
   const r = 2.6;
