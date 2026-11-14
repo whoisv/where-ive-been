@@ -3,7 +3,7 @@
 Releases of Where I've Been. Each release is one production deploy; the version shows in the map's bottom-right corner.
 
 ## Pending release (on `preview`, not yet live)
-- v1.16: Help & About page (Help link in the panel and on the sign-in screen; shareable at whereihavebeen.com/#help) with how-to, badges and community, common questions, privacy and contact.
+- v1.16: Help & About page (Help link in the panel and on the sign-in screen; shareable at whereihavebeen.com/#help) with how-to, badges and community, common questions, privacy and contact (help@whereihavebeen.com).
 
 ## v1.15 · Nov 13, 2026 (live)
 - Badges. 22 badges in five groups (countries, continents, collections, trips, notes), a badge row on the panel, a full badge page with progress bars, and a "New badge!" pop-up.
