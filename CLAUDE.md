@@ -6,7 +6,7 @@ Where I've Been: a static travel-map app (index.html + config.js + countries-dat
 - Greenland (GL) is its own country, not folded into Denmark.
 - French Polynesia (PF) is its own entry, not folded into France.
 - French Guiana (GF) is its own entry, cut out of France's outline when the map data draws them together (`splitTerritory`).
-- Palestine (PS) is excluded from the checklist and counts; its shape stays as plain, unclickable land.
+- Palestine (PS) and Kosovo (XK) are excluded from the checklist and counts (`EXCLUDE`); their shapes stay as plain, unclickable land. Northern Cyprus and Somaliland are not countries in this app either.
 - Rule: only places in the country count appear on the map. Anything without a continent in `CONTINENTS` (disputed or unrecognised regions in the map data) is plain land too. Other territories (see `PARENT` in index.html) get no dot, and their shapes are plain, unclickable land. Every sovereign country in the count must stay on the map: small ones have backup dots in `SMALL`, drawn only when the map data lacks an outline. A visit to one still counts toward the parent country (Import a list maps "Hong Kong" → China, "Puerto Rico" → US).
 - United States is listed first in the home-country dropdown.
 - Antarctica is included as its own continent.

@@ -4,7 +4,7 @@ Releases of Where I've Been. Each release is one production deploy; the version 
 
 ## Pending release (on `preview`, not yet live)
 - v1.16: Help & About page (Help link in the panel and on the sign-in screen; shareable at whereihavebeen.com/#help) with how-to, badges and community, common questions, privacy and contact (help@whereihavebeen.com).
-- Removed the "Other" group: disputed or unrecognised regions are plain land, not countries.
+- Removed the "Other" group (including Northern Cyprus and Somaliland) and Kosovo: shown as plain land, not counted.
 - Continents listed in alphabetical order (panel bars, Check off countries, leaderboard choices).
 
 ## v1.15 · Nov 13, 2026 (live)

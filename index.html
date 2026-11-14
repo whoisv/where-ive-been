@@ -804,7 +804,7 @@ function openHelp() {
         ])),
       sec("Common questions",
         Q("What counts as a country?",
-          P_("The 193 UN member states plus Vatican City, Kosovo and Taiwan, and a few places the app lists separately: Greenland, French Polynesia and French Guiana. Antarctica counts as its own continent.")),
+          P_("The UN member states plus Vatican City and Taiwan, and a few places the app lists separately: Greenland, French Polynesia and French Guiana. Antarctica counts as its own continent. Disputed regions such as Kosovo, Northern Cyprus and Somaliland aren't listed.")),
         Q("Why isn't Puerto Rico (or Hong Kong, Bermuda…) on the list?",
           P_("Territories count toward the country they belong to. Puerto Rico counts as the United States, Hong Kong as China, Bermuda as the United Kingdom. If you paste them into Import a list, the parent country is checked off for you.")),
         Q("My confirmation email didn't arrive.",
@@ -1220,7 +1220,7 @@ const SMALL = [
   ["GQ","Equatorial Guinea",10.27,1.65],["IL","Israel",34.85,31.05],["HT","Haiti",-72.29,18.97],["DO","Dominican Republic",-70.16,18.74]
 ];
 /* Shapes left off the checklist and counts: drawn as plain land, not clickable. */
-const EXCLUDE = new Set(["PS"]);
+const EXCLUDE = new Set(["PS", "XK"]);   // owner's choice: Palestine and Kosovo are not counted
 
 /* Simplified Antarctic coastline [lon, lat], west to east, for map data that leaves it out. */
 const AQ_COAST = [[-180,-78],[-165,-78],[-150,-76.5],[-135,-74.5],[-120,-73.5],[-105,-73],[-90,-72.5],[-78,-72],[-70,-69],
@@ -1280,7 +1280,7 @@ function addSmall(geo) {
   const have = new Set(geo.list.map(c => c.code));
   const r = 2.6;
   for (const [code, name, lon, lat] of SMALL) {
-    if (have.has(code) || PARENT[code]) continue;   // territories outside the country count get no dot
+    if (have.has(code) || PARENT[code] || EXCLUDE.has(code)) continue;   // territories outside the country count get no dot
     const p = geo.proj(lon, lat);
     if (!p || !isFinite(p[0]) || !isFinite(p[1])) continue;
     const [x, y] = p;
