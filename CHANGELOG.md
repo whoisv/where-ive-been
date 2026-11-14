@@ -9,6 +9,7 @@ Releases of Where I've Been. Each release is one production deploy; the version 
 - Your home country is marked as visited automatically.
 - "Days on the road" and "countries this year" tiles only appear once you've entered years or dated trips.
 - "Check off countries" redesigned: continents fold open, and countries are flag chips you tap to mark visited.
+- Territories outside the country count (Cayman Islands, Turks and Caicos, Bermuda, Martinique, Puerto Rico and others) no longer show as dots or colored shapes.
 - French Guiana is its own entry (South America), no longer part of France.
 - Headline no longer shows the logged-trip count ("1 trip"), which read as if only one trip had been taken.
 - Fix: after setting a new password, go straight to the map instead of staying on the reset screen.

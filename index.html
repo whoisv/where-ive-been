@@ -1191,7 +1191,7 @@ function addSmall(geo) {
   const have = new Set(geo.list.map(c => c.code));
   const r = 2.6;
   for (const [code, name, lon, lat] of SMALL) {
-    if (have.has(code)) continue;
+    if (have.has(code) || PARENT[code]) continue;   // territories outside the country count get no dot
     const p = geo.proj(lon, lat);
     if (!p || !isFinite(p[0]) || !isFinite(p[1])) continue;
     const [x, y] = p;
@@ -1206,8 +1206,10 @@ let svg, gRoot, paths, zoom, mapW, mapH;
 function drawMap(geo) {
   mapW = geo.W; mapH = geo.H;
   const seen = new Set();
-  const inert = geo.list.filter(c => EXCLUDE.has(c.code));
-  countries = geo.list.filter(c => !EXCLUDE.has(c.code) && !seen.has(c.code) && seen.add(c.code)).sort((a, b) => a.name.localeCompare(b.name));
+  // Places outside the country count (excluded places and territories) are plain, unclickable land.
+  const outside = c => EXCLUDE.has(c.code) || !!PARENT[c.code];
+  const inert = geo.list.filter(outside);
+  countries = geo.list.filter(c => !outside(c) && !seen.has(c.code) && seen.add(c.code)).sort((a, b) => a.name.localeCompare(b.name));
   countries.forEach(c => byCode[c.code] = c);
   listCountries = countries.filter(c => eff(c.code) === c.code);
 
@@ -1763,6 +1765,7 @@ function matchCountry(raw) {
   if (!n) return null;
   const alias = ALIASES[raw.toLowerCase().replace(/[^a-z]+/g, " ").trim()] || ALIASES[n];
   if (alias && byCode[alias]) return alias;
+  if (alias && PARENT[alias] && byCode[PARENT[alias]]) return PARENT[alias];
   if (/^[A-Za-z]{2}$/.test(raw.trim()) && byCode[raw.trim().toUpperCase()]) return raw.trim().toUpperCase();
   const exact = countries.filter(c => norm(c.name) === n);
   if (exact.length === 1) return exact[0].code;

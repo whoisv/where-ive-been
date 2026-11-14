@@ -7,7 +7,7 @@ Where I've Been: a static travel-map app (index.html + config.js + countries-dat
 - French Polynesia (PF) is its own entry, not folded into France.
 - French Guiana (GF) is its own entry, cut out of France's outline when the map data draws them together (`splitTerritory`).
 - Palestine (PS) is excluded from the checklist and counts; its shape stays as plain, unclickable land.
-- Other territories count toward their parent country (Hong Kong/Macau → China, Puerto Rico/Guam → US, etc.). See `PARENT` in index.html.
+- Rule: only places in the country count appear on the map. Other territories (see `PARENT` in index.html) get no dot, and their shapes are plain, unclickable land. A visit to one still counts toward the parent country (Import a list maps "Hong Kong" → China, "Puerto Rico" → US).
 - United States is listed first in the home-country dropdown.
 - Antarctica is included as its own continent.
 - One opt-in switch, "Join the traveler community" (`profiles.is_public`, off by default), gates every feature that shows a user to others: leaderboards now, comparisons and similar later. Members appear by screen name only; never email, trips or notes.
