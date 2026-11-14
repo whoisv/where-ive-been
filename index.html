@@ -281,6 +281,15 @@ details.more .more-body { display: grid; gap: 18px; padding: 4px 12px 14px; }
 .chip.on { background: color-mix(in srgb, var(--cc, var(--accent)) 22%, var(--surface)); border-color: var(--cc, var(--accent)); color: var(--ink); font-weight: 600; }
 .chip .tick { font-size: 12px; color: var(--cc, var(--accent)); font-weight: 700; }
 .chip:disabled { opacity: .6; cursor: default; }
+/* Help page */
+.help h3 { margin-top: 4px; }
+.help p, .help li { font-size: 14px; line-height: 1.55; margin: 0; }
+.help ul { margin: 0; padding-left: 18px; display: grid; gap: 6px; }
+.help details { border: 1px solid var(--line); border-radius: 8px; padding: 0 12px; }
+.help details + details { margin-top: 6px; }
+.help summary { cursor: pointer; padding: 10px 0; font-weight: 600; font-size: 14px; }
+.help details > p, .help details > ul { padding-bottom: 12px; }
+.help .contact { border: 1px solid var(--line); border-radius: 10px; padding: 12px; background: var(--bg); }
 .toast { position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); background: var(--ink); color: var(--bg); padding: 8px 14px; border-radius: 8px; font-size: 13px; opacity: 0; pointer-events: none; transition: opacity .2s; }
 .toast.show { opacity: 1; }
 
@@ -323,7 +332,7 @@ details.more .more-body { display: grid; gap: 18px; padding: 4px 12px 14px; }
       <div class="tiles" id="tiles"></div>
       <ul class="conts" id="conts"></ul>
       <button type="button" class="badge-row" id="badgeRow" aria-label="See all badges"></button>
-      <div class="status" id="status"><span id="statusText"><i class="dot"></i>Connecting…</span><span style="display:flex;gap:12px;flex-wrap:wrap;justify-content:flex-end"><button type="button" class="linkbtn" id="importBtn">Import a list</button><button type="button" class="linkbtn" id="copyBtn">Copy my list</button><button type="button" class="linkbtn" id="profileBtn" hidden>Profile</button><button type="button" class="linkbtn" id="signOutBtn" hidden>Sign out</button></span></div>
+      <div class="status" id="status"><span id="statusText"><i class="dot"></i>Connecting…</span><span style="display:flex;gap:12px;flex-wrap:wrap;justify-content:flex-end"><button type="button" class="linkbtn" id="importBtn">Import a list</button><button type="button" class="linkbtn" id="copyBtn">Copy my list</button><button type="button" class="linkbtn" id="profileBtn" hidden>Profile</button><button type="button" class="linkbtn" id="signOutBtn" hidden>Sign out</button><button type="button" class="linkbtn" id="helpBtn">Help</button></span></div>
     </div>
 
     <div class="view" id="listView" hidden>
@@ -367,6 +376,7 @@ details.more .more-body { display: grid; gap: 18px; padding: 4px 12px 14px; }
             <button type="button" class="linkbtn" id="authSwitch">Create a new account</button>
             <button type="button" class="linkbtn" id="forgotBtn">Forgot password?</button>
           </div>
+          <p class="hint">New here or stuck? <button type="button" class="linkbtn" id="authHelpBtn">Help &amp; About</button></p>
           <p class="hint" id="authMsg" aria-live="polite"></p>
         </form>
         <div class="sec" id="checkEmail" hidden>
@@ -402,7 +412,7 @@ details.more .more-body { display: grid; gap: 18px; padding: 4px 12px 14px; }
 "use strict";
 
 /* Bump on every change so it's easy to see which version is live. */
-const APP_VERSION = "v1.15 · Nov 13, 2026";
+const APP_VERSION = "v1.16 · Nov 13, 2026 · preview";
 
 /* ---------- Reference data ---------- */
 const CONTINENTS = {
@@ -749,6 +759,78 @@ function ensureHomeVisited() {
   renderSummary(); paintMap(); renderList();
   toast(`${byCode[code].name} marked as visited (your home country)`);
 }
+
+
+/* ---------- Help & About ---------- */
+// Set this to the address people should write to. Leave empty to hide the contact line.
+const SUPPORT_EMAIL = "whoisvinod@gmail.com";
+
+function openHelp() {
+  selected = null; paintMap();
+  showView("detail");
+  const P_ = text => el("p", { text });
+  const UL = items => el("ul", {}, ...items.map(t => el("li", { text: t })));
+  const Q = (q, ...body) => el("details", {}, el("summary", { text: q }), ...body);
+  const sec = (title, ...body) => el("section", { class: "sec" }, el("h3", { text: title }), ...body);
+
+  const contact = SUPPORT_EMAIL
+    ? el("div", { class: "contact" },
+        el("p", {}, "Questions, ideas or a problem? Email ", el("b", { text: SUPPORT_EMAIL }), "."),
+        el("p", {}, el("a", { href: "mailto:" + SUPPORT_EMAIL, text: "Write an email" })))
+    : null;
+
+  $("detail").replaceChildren(
+    el("button", { type: "button", class: "back", onclick: closeDetail }, "← Back"),
+    el("div", { class: "d-head" }, el("h2", { text: "Help & About" }), el("span", { class: "cont", text: "Where I've Been · " + APP_VERSION })),
+    el("div", { class: "help", style: "display:grid;gap:18px" },
+      sec("About",
+        P_("Where I've Been is a personal travel map. Mark the countries you've visited, keep notes on your trips, earn badges, and, if you like, compare your travels with other people in the traveler community."),
+        P_("It was built by Vinod Kasturi, who has been to 79 countries and wanted a better way to keep track.")),
+      sec("How to use it",
+        UL([
+          "Mark a country: open Check off countries, open a continent and tap the country. Tap again to undo. On a computer you can also double-click a country on the map.",
+          "Open a country's page: click it on the map, or click its name in the Visited tab. You'll see a photo, the flag and key facts.",
+          "Year first visited: type the year on a country's page. It feeds your \"traveling since\" year, countries this year and the Big year badge.",
+          "Trips and notes (optional): on a country's page, open Add trip details and notes to log each visit with dates and what you did.",
+          "Import a list: paste many countries at once (one per line or separated by commas) and they're all checked off.",
+          "Copy my list: copies your countries, with years and dates, to paste anywhere."
+        ])),
+      sec("Badges and the traveler community",
+        UL([
+          "Badges are earned automatically from your countries, continents, trips and notes. Click the badge row under the continent bars to see them all and how close you are to each.",
+          "Join the traveler community (in Profile) to appear on leaderboards by your screen name, with your home and country counts.",
+          "Others never see your email, your trips or your notes. You can leave the community at any time in Profile."
+        ])),
+      sec("Common questions",
+        Q("What counts as a country?",
+          P_("The 193 UN member states plus Vatican City, Kosovo and Taiwan, and a few places the app lists separately: Greenland, French Polynesia and French Guiana. Antarctica counts as its own continent.")),
+        Q("Why isn't Puerto Rico (or Hong Kong, Bermuda…) on the list?",
+          P_("Territories count toward the country they belong to. Puerto Rico counts as the United States, Hong Kong as China, Bermuda as the United Kingdom. If you paste them into Import a list, the parent country is checked off for you.")),
+        Q("My confirmation email didn't arrive.",
+          UL(["Wait a minute or two and check your spam or junk folder.",
+              "On the sign-in screen, type your email and password and click Sign in. If your account isn't confirmed yet, you'll get a Resend email button.",
+              "Only the newest email's link works. Older links stop working once a new one is sent."])),
+        Q("The email link says it expired or was already used.",
+          P_("Some email services open links to scan them, which can use up the link. Try signing in first; your account is often confirmed already. If not, use Resend email to get a fresh link.")),
+        Q("I forgot my password.",
+          P_("On the sign-in screen, type your email and click Forgot password?. Open the link in the email, choose a new password, and you're back in.")),
+        Q("How do I change my screen name or home country?",
+          P_("Click Profile next to Sign out. Your home country is counted as visited automatically.")),
+        Q("Does it work on my phone?",
+          P_("Yes. Open whereihavebeen.com in your phone's browser. On phones, tap countries in the list rather than double-clicking the map."))),
+      sec("Privacy",
+        UL([
+          "We store your email address (for signing in), the countries you mark, and any years, trips and notes you add. Your screen name and home location are stored only if you enter them.",
+          "Your map is private. Only if you join the traveler community do others see your screen name, home and country counts.",
+          "We don't sell your data or show ads. Signing in and data storage are handled by Supabase; sign-in emails are sent through Resend.",
+          "Delete your account at any time from Profile. It permanently removes your login and everything you've saved."
+        ])),
+      contact ? sec("Contact", contact) : null));
+  $("detail").scrollTop = 0;
+}
+$("helpBtn").addEventListener("click", openHelp);
+$("authHelpBtn").addEventListener("click", openHelp);
+window.addEventListener("hashchange", () => { if (location.hash === "#help") openHelp(); });
 
 /* ---------- Sign in / sign up ---------- */
 let authMode = "signin";   // signin | signup | reset
@@ -1861,7 +1943,7 @@ document.addEventListener("keydown", e => { if (e.key === "Escape" && selected) 
   addSmall(geo);
   drawMap(geo);
   renderAll();
-  initAuth();
+  initAuth().then(() => { if (location.hash === "#help") openHelp(); });
 })();
 })();
 </script>
