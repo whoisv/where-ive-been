@@ -1,6 +1,6 @@
 # Project notes for Claude
 
-Where I've Been: a static travel-map app (index.html + config.js + countries-data.js), Supabase back end, deployed by Netlify from this repo's `main` branch.
+Where I've Been: a static travel-map app (index.html + config.js + countries-data.js), Supabase back end, deployed by Netlify from this repo's `main` branch. Live at https://whereihavebeen.com (domain at Squarespace, DNS records point to Netlify; HTTPS by Let's Encrypt). Preview: https://preview--whereihavebeen.netlify.app.
 
 ## Owner's decisions (keep these on every change)
 - Greenland (GL) is its own country, not folded into Denmark.

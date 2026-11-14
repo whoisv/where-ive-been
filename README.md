@@ -2,7 +2,7 @@
 
 A travel map anyone can sign up for. Each person marks the countries they've visited, logs trips with dates and notes, and sees how they rank against other travelers. Every map is private to its owner.
 
-**Live site:** https://whereihavebeen.netlify.app
+**Live site:** https://whereihavebeen.com (also https://whereihavebeen.netlify.app, which redirects)
 
 ## Features
 
