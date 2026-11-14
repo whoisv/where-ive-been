@@ -3,10 +3,13 @@
 Releases of Where I've Been. Each release is one production deploy; the version shows in the map's bottom-right corner.
 
 ## Pending release (on `preview`, not yet live)
-- v1.13: Clear message when an email link has expired or was already used.
-- v1.14: Signing in to an unconfirmed account opens "Check your email" with Resend ready.
+- Nothing yet.
 
-## v1.12 · Nov 12, 2026 (live)
+## v1.14 · Nov 13, 2026 (live)
+- Clear message when an email link has expired or was already used (v1.13).
+- Signing in to an unconfirmed account opens "Check your email" with Resend ready.
+
+## v1.12 · Nov 12, 2026
 - French Polynesia is its own entry.
 - Greenland is its own entry (v1.6).
 - "Join the traveler community" opt-in at sign-up and in Profile (v1.8–v1.9).
