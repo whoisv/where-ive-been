@@ -1304,7 +1304,7 @@ function renderSummary() {
   const total = listCountries.length;
   const pct = total ? Math.round(100 * visited.length / total) : 0;
   $("countLabel").replaceChildren(`of ${total} countries`, el("br"),
-    el("em", { text: `${pct}% of the world · ${trips} trip${trips === 1 ? "" : "s"}${years.length ? " · since " + years[0].slice(0, 4) : ""}` }));
+    el("em", { text: `${pct}% of the world${years.length ? " · since " + years[0].slice(0, 4) : ""}` }));
   renderTiles(visited);
   renderBadgeRow();
 
