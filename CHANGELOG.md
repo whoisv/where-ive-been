@@ -3,7 +3,10 @@
 Releases of Where I've Been. Each release is one production deploy; the version shows in the map's bottom-right corner.
 
 ## Pending release (on `preview`, not yet live)
-- v1.15: Badges. 22 badges in five groups (countries, continents, collections, trips, notes), a badge row on the panel, a full badge page with progress bars, and a "New badge!" pop-up.
+- Nothing yet.
+
+## v1.15 · Nov 13, 2026 (live)
+- Badges. 22 badges in five groups (countries, continents, collections, trips, notes), a badge row on the panel, a full badge page with progress bars, and a "New badge!" pop-up.
 - "Year first visited" on each country page; trips and notes move under an optional "Add trip details and notes" section. The year counts toward "since", countries this year, the Big year badge and the this-year leaderboard. Requires add-first-year.sql.
 - Name line at the top of the panel: home-country flag, screen name, home, and "traveling since" once a year is entered.
 - Your home country is marked as visited automatically.
@@ -14,7 +17,7 @@ Releases of Where I've Been. Each release is one production deploy; the version 
 - Headline no longer shows the logged-trip count ("1 trip"), which read as if only one trip had been taken.
 - Fix: after setting a new password, go straight to the map instead of staying on the reset screen.
 
-## v1.14 · Nov 13, 2026 (live)
+## v1.14 · Nov 13, 2026
 - Clear message when an email link has expired or was already used (v1.13).
 - Signing in to an unconfirmed account opens "Check your email" with Resend ready.
 
