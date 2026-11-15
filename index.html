@@ -121,14 +121,31 @@ button, input, textarea { font: inherit; color: inherit; }
 .big span { color: var(--muted); font-size: 14px; }
 .share-btn { margin-left: auto; align-self: center; flex: none; display: inline-flex; align-items: center; gap: 6px; padding: 7px 13px; border-radius: 999px; border: 1.5px solid var(--accent); background: transparent; color: var(--accent); font-weight: 600; font-size: 13px; cursor: pointer; }
 .share-btn:hover { background: var(--accent); color: var(--accent-ink); }
-.share-opts { display: flex; gap: 8px; flex-wrap: wrap; }
-.share-seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
-.share-seg button { border: 0; background: transparent; padding: 6px 12px; font-size: 13px; cursor: pointer; color: var(--muted); }
+.share-btn:focus-visible { outline-offset: 2px; }
+.share-dlg { border: 0; padding: 0; background: transparent; max-width: none; max-height: none; color: var(--ink); }
+.share-dlg::backdrop { background: rgba(10, 16, 24, .55); backdrop-filter: blur(2px); }
+.share-box { background: var(--surface); border-radius: 16px; box-shadow: 0 20px 60px rgba(0,0,0,.35); width: min(940px, calc(100vw - 48px)); max-height: calc(100vh - 48px); display: flex; flex-direction: column; overflow: hidden; }
+.share-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 16px 20px; border-bottom: 1px solid var(--line); }
+.share-top h2 { font-family: var(--font-display); font-weight: 700; font-size: 24px; margin: 0; }
+.share-x { width: 36px; height: 36px; border-radius: 50%; border: 0; background: var(--bg); font-size: 16px; cursor: pointer; color: var(--muted); }
+.share-x:hover { color: var(--ink); }
+.share-body { display: grid; grid-template-columns: minmax(0, 1fr) 280px; gap: 20px; padding: 20px; overflow: auto; min-height: 0; }
+.share-side { display: flex; flex-direction: column; gap: 16px; }
+.share-field { display: grid; gap: 6px; }
+.share-field > span { font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+.share-seg { display: flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.share-seg button { flex: 1; border: 0; background: transparent; padding: 8px 10px; font-size: 14px; cursor: pointer; color: var(--muted); }
 .share-seg button + button { border-left: 1px solid var(--line); }
 .share-seg button[aria-pressed="true"] { background: var(--accent-soft); color: var(--ink); font-weight: 600; }
-.share-preview { display: grid; place-items: center; background: var(--bg); border: 1px solid var(--line); border-radius: 12px; padding: 12px; }
-.share-canvas { display: block; max-width: 100%; max-height: 62vh; width: auto; height: auto; border-radius: 6px; box-shadow: 0 2px 14px rgba(0,0,0,.14); }
-.share-actions { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 8px; }
+.share-preview { display: grid; place-items: center; background: var(--bg); border-radius: 12px; padding: 16px; height: min(620px, calc(100vh - 170px)); min-height: 260px; }
+.share-canvas { display: block; border-radius: 6px; box-shadow: 0 2px 14px rgba(0,0,0,.16); }
+.share-actions { display: grid; gap: 8px; margin-top: auto; }
+@media (max-width: 760px) {
+  .share-box { width: 100vw; height: 100dvh; max-height: none; border-radius: 0; }
+  .share-body { grid-template-columns: 1fr; padding: 16px; gap: 16px; }
+  .share-preview { padding: 10px; height: 50dvh; }
+  .share-actions { position: sticky; bottom: 0; background: var(--surface); padding-top: 8px; }
+}
 .big em { font-style: normal; color: var(--ink); font-weight: 500; }
 
 .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(78px, 1fr)); gap: 8px; }
@@ -411,6 +428,7 @@ details.more .more-body { display: grid; gap: 18px; padding: 4px 12px 14px; }
   </aside>
 </div>
 <div class="toast" id="toast" role="status"></div>
+<dialog class="share-dlg" id="shareDlg" aria-labelledby="shareTitle"></dialog>
 <datalist id="usStates"></datalist>
 
 <script src="config.js"></script>
@@ -422,7 +440,7 @@ details.more .more-body { display: grid; gap: 18px; padding: 4px 12px 14px; }
 "use strict";
 
 /* Bump on every change so it's easy to see which version is live. */
-const APP_VERSION = "v1.18 · Nov 15, 2026";
+const APP_VERSION = "v1.19 · Nov 15, 2026";
 
 /* ---------- Reference data ---------- */
 const CONTINENTS = {
@@ -2033,8 +2051,6 @@ async function shareBlob(canvas) {
 function openShare() {
   if (!session) { showView("auth"); toast("Sign in first"); return; }
   if (!mapGeo) { toast("The map is still loading"); return; }
-  selected = null; paintMap();
-  showView("detail");
   const canvas = el("canvas", { class: "share-canvas", role: "img", "aria-label": "Preview of your map image" });
   const seg = (key, choices) => el("div", { class: "share-seg", role: "group" }, ...choices.map(([v, label]) =>
     el("button", { type: "button", "aria-pressed": String(shareOpts[key] === v), onclick: () => { shareOpts[key] = v; redraw(); } }, label)));
@@ -2056,7 +2072,19 @@ function openShare() {
     canvas.width = off.width; canvas.height = off.height;
     canvas.getContext("2d").drawImage(off, 0, 0);
     canvas.dataset.size = shareOpts.size;
+    fit();
   }
+  // Scale the preview to fit its frame, whatever the image's shape.
+  function fit() {
+    const box = canvas.parentElement; if (!box || !canvas.width) return;
+    const cs = getComputedStyle(box);
+    const w = box.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+    const h = box.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
+    const k = Math.min(w / canvas.width, h / canvas.height);
+    canvas.style.width = Math.floor(canvas.width * k) + "px";
+    canvas.style.height = Math.floor(canvas.height * k) + "px";
+  }
+  window.addEventListener("resize", fit);
   dlBtn.onclick = async () => {
     const blob = await shareBlob(canvas).catch(() => null);
     if (!blob) { toast("Couldn't make the image. Try again."); return; }
@@ -2073,14 +2101,24 @@ function openShare() {
       else await navigator.share({ text: text(), url: "https://whereihavebeen.com" });
     } catch (e) { if (e && e.name !== "AbortError") dlBtn.click(); }
   };
-  $("detail").replaceChildren(
-    el("button", { type: "button", class: "back", onclick: closeDetail }, "← All countries"),
-    el("div", { class: "d-head" }, el("h2", { text: "Share your map" })),
-    el("p", { class: "hint", text: "An image of your map to post or send. It shows your screen name, home and country counts. Your email, trips and notes stay private." }),
-    el("div", { class: "share-opts" }, sizeSeg, themeSeg),
-    el("div", { class: "share-preview" }, canvas),
-    el("div", { class: "share-actions" }, canShareFiles ? shareBtn : null, dlBtn),
-    el("p", { class: "hint", text: "Change your screen name or home in Profile." }));
+  // Opens as a pop-up over the page (full screen on phones), so it's never off-screen below the panel.
+  const dlg = $("shareDlg");
+  const close = () => dlg.close();
+  dlg.replaceChildren(el("div", { class: "share-box" },
+    el("div", { class: "share-top" },
+      el("h2", { id: "shareTitle", text: "Share your map" }),
+      el("button", { type: "button", class: "share-x", "aria-label": "Close", onclick: close }, "✕")),
+    el("div", { class: "share-body" },
+      el("div", { class: "share-preview" }, canvas),
+      el("div", { class: "share-side" },
+        el("p", { class: "hint", text: "An image of your map to post or send. It shows your screen name, home and country counts. Your email, trips and notes stay private." }),
+        el("div", { class: "share-field" }, el("span", { text: "Size" }), sizeSeg),
+        el("div", { class: "share-field" }, el("span", { text: "Look" }), themeSeg),
+        el("div", { class: "share-actions" }, canShareFiles ? shareBtn : null, dlBtn),
+        el("p", { class: "hint", text: "Change your screen name or home in Profile." })))));
+  dlg.onclick = e => { if (e.target === dlg) close(); };
+  dlg.onclose = () => window.removeEventListener("resize", fit);   // click outside the box closes it
+  if (dlg.showModal) dlg.showModal(); else dlg.setAttribute("open", "");
   redraw();
 }
 $("shareBtn").addEventListener("click", openShare);
