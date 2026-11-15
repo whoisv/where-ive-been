@@ -4,6 +4,7 @@ Releases of Where I've Been. Each release is one production deploy; the version 
 
 ## Pending release (on `preview`, not yet live)
 - v1.17: Admin console at /admin.html (admins only): total sign-ups, new and active this week/month, sign-ups per day or week with a running total, most-visited and home countries, and a searchable, sortable list of every traveler (email, sign-up date, last sign-in, last change, email confirmed, sign-in method, home, community member, countries, continents, trips, notes) with CSV download. An "Admin" link appears in the panel for admins only. Requires admin.sql (put your email in it first).
+- v1.18: Share my map. A "Share my map" button next to your country count makes an image of your map with visited countries in their continent colors, your screen name, home, "traveling since", country count, share of the world and continents, plus "Made with Where I've Been · whereihavebeen.com" at the bottom. Three sizes (Square for posts, Story with continent counts and flags, Wide for Facebook/X/link previews), light or dark. On phones it opens the share sheet; on computers it downloads a PNG. Never shows email, trips or notes.
 
 ## v1.16 · Nov 13, 2026 (live)
 - Help & About page (Help link in the panel and on the sign-in screen; shareable at whereihavebeen.com/#help) with how-to, badges and community, common questions, privacy and contact (help@whereihavebeen.com).

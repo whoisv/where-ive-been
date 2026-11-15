@@ -13,6 +13,7 @@ A travel map anyone can sign up for. Each person marks the countries they've vis
 - **Rank among all travelers** and your percentile, worked out without revealing anyone's countries.
 - **Leaderboards** (opt-in, by screen name): all travelers, most countries this year, each continent, your home country and your home state.
 - **Checklist and search** to tick countries off quickly, plus **Import a list** (paste names) and **Copy my list**.
+- **Share my map:** an image of your map with your screen name and counts, in square, story or wide sizes, to post or send.
 - **Delete my account** in Profile: removes the login and all of that person's data.
 - **Accounts:** email sign-up, password reset, optional Google sign-in, a screen name (defaults to the email address), and a home country, state and continent.
 - About 70 small countries and islands appear as dots. Territories count toward their parent country (Hong Kong with China, Puerto Rico with the US).

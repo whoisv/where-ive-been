@@ -119,6 +119,16 @@ button, input, textarea { font: inherit; color: inherit; }
 .big { display: flex; align-items: baseline; gap: 10px; }
 .big strong { font-family: var(--font-display); font-weight: 700; font-size: 52px; line-height: 1; font-variant-numeric: tabular-nums; color: var(--accent); }
 .big span { color: var(--muted); font-size: 14px; }
+.share-btn { margin-left: auto; align-self: center; flex: none; display: inline-flex; align-items: center; gap: 6px; padding: 7px 13px; border-radius: 999px; border: 1.5px solid var(--accent); background: transparent; color: var(--accent); font-weight: 600; font-size: 13px; cursor: pointer; }
+.share-btn:hover { background: var(--accent); color: var(--accent-ink); }
+.share-opts { display: flex; gap: 8px; flex-wrap: wrap; }
+.share-seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.share-seg button { border: 0; background: transparent; padding: 6px 12px; font-size: 13px; cursor: pointer; color: var(--muted); }
+.share-seg button + button { border-left: 1px solid var(--line); }
+.share-seg button[aria-pressed="true"] { background: var(--accent-soft); color: var(--ink); font-weight: 600; }
+.share-preview { display: grid; place-items: center; background: var(--bg); border: 1px solid var(--line); border-radius: 12px; padding: 12px; }
+.share-canvas { display: block; max-width: 100%; max-height: 62vh; width: auto; height: auto; border-radius: 6px; box-shadow: 0 2px 14px rgba(0,0,0,.14); }
+.share-actions { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 8px; }
 .big em { font-style: normal; color: var(--ink); font-weight: 500; }
 
 .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(78px, 1fr)); gap: 8px; }
@@ -328,7 +338,7 @@ details.more .more-body { display: grid; gap: 18px; padding: 4px 12px 14px; }
   <aside class="panel">
     <div class="summary">
       <div class="me-line" id="meLine" hidden></div>
-      <div class="big"><strong id="count">0</strong><span id="countLabel">countries visited</span></div>
+      <div class="big"><strong id="count">0</strong><span id="countLabel">countries visited</span><button type="button" class="share-btn" id="shareBtn" hidden>Share my map</button></div>
       <div class="tiles" id="tiles"></div>
       <ul class="conts" id="conts"></ul>
       <button type="button" class="badge-row" id="badgeRow" aria-label="See all badges"></button>
@@ -412,7 +422,7 @@ details.more .more-body { display: grid; gap: 18px; padding: 4px 12px 14px; }
 "use strict";
 
 /* Bump on every change so it's easy to see which version is live. */
-const APP_VERSION = "v1.17 · Nov 15, 2026";
+const APP_VERSION = "v1.18 · Nov 15, 2026";
 
 /* ---------- Reference data ---------- */
 const CONTINENTS = {
@@ -1087,6 +1097,7 @@ function handleSession(s, event) {
   session = s;
   $("signOutBtn").hidden = !s;
   $("profileBtn").hidden = !s;
+  $("shareBtn").hidden = !s;
   if (!s) $("adminLink").hidden = true;
   if (s && prev === s.user.id && P.mode === "cloud" && !pendingCodes().size) setStatus("ok", signedInText());
   if (event === "PASSWORD_RECOVERY") { setAuthMode("reset"); showView("auth"); return; }
@@ -1300,9 +1311,10 @@ function addSmall(geo) {
 }
 
 /* ---------- Map rendering ---------- */
-let svg, gRoot, paths, zoom, mapW, mapH;
+let svg, gRoot, paths, zoom, mapW, mapH, mapGeo = null;
 
 function drawMap(geo) {
+  mapGeo = geo;
   mapW = geo.W; mapH = geo.H;
   const seen = new Set();
   // Places outside the country count (excluded places and territories) are plain, unclickable land.
@@ -1840,6 +1852,238 @@ function moreDetails(code, r, ...content) {
 }
 
 function renderAll() { renderSummary(); paintMap(); renderList(); renderDetail(); }
+
+/* ---------- Share my map: an image of your map to post or send ---------- */
+// Drawn on a canvas from the same outlines as the live map. Shows screen name, home, counts and flags;
+// never email, trips or notes.
+const SHARE_SIZES = { square: [1080, 1080, "Square"], story: [1080, 1920, "Story"], wide: [1200, 630, "Wide"] };
+const SHARE_THEMES = {
+  light: { bg: "#ffffff", ocean: "#e8eef4", land: "#c7d0da", ink: "#18212b", muted: "#5b6978", line: "#d6dce3", accent: "#1f56d6", tint: .22,
+           c: { EU: "#3466e0", AS: "#e2483a", AF: "#e69a12", NA: "#23a066", SA: "#8a4bd8", OC: "#0fa3b8", AN: "#6f8295" } },
+  dark:  { bg: "#0e1319", ocean: "#151c24", land: "#2c3743", ink: "#e6ebf1", muted: "#93a0ae", line: "#29333f", accent: "#5b8cff", tint: .26,
+           c: { EU: "#5f8cff", AS: "#ff6b5c", AF: "#f6b73c", NA: "#3cc184", SA: "#a77bf0", OC: "#2cc3d6", AN: "#93a5b8" } }
+};
+let shareOpts = { size: "square", theme: window.matchMedia && matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light" };
+const flagImgCache = {};
+
+function mixHex(a, b, t) {   // t of a, the rest b
+  const p = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
+  const A = p(a), B = p(b);
+  return "#" + A.map((v, i) => Math.round(v * t + B[i] * (1 - t)).toString(16).padStart(2, "0")).join("");
+}
+function loadFlag(code) {
+  if (!flagImgCache[code]) flagImgCache[code] = new Promise(res => {
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => res(img); img.onerror = () => res(null);
+    img.src = `https://flagcdn.com/w80/${code.toLowerCase()}.png`;
+    setTimeout(() => res(null), 6000);
+  });
+  return flagImgCache[code];
+}
+function shareStats() {
+  const visited = listCountries.filter(c => isVisited(c.code));
+  const conts = CONT_AZ.filter(k => visited.some(c => contOf[c.code] === k));
+  const years = visited.map(c => firstDate(rec(c.code))).filter(Boolean).sort();
+  const total = listCountries.length;
+  return { visited, conts, total, pct: total ? Math.round(100 * visited.length / total) : 0, since: years.length ? years[0].slice(0, 4) : "" };
+}
+function rrect(ctx, x, y, w, h, r) {
+  ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
+}
+function fitText(ctx, text, maxW, size, weight, family) {
+  let s = size;
+  do { ctx.font = `${weight} ${s}px ${family}`; if (ctx.measureText(text).width <= maxW) break; s -= 2; } while (s > 14);
+  if (ctx.measureText(text).width > maxW) {   // still too long: trim with an ellipsis
+    while (text.length > 1 && ctx.measureText(text + "…").width > maxW) text = text.slice(0, -1);
+    text += "…";
+  }
+  return text;
+}
+
+async function drawShareCard(canvas, opts, withFlags = true) {
+  const [W, H] = SHARE_SIZES[opts.size], T = SHARE_THEMES[opts.theme];
+  const DISPLAY = '"Bricolage Grotesque", system-ui, sans-serif', BODY = '"IBM Plex Sans", system-ui, sans-serif', MONO = '"IBM Plex Mono", ui-monospace, monospace';
+  try { await Promise.all([`700 40px ${DISPLAY}`, `400 20px ${BODY}`, `600 20px ${BODY}`, `500 20px ${MONO}`].map(f => document.fonts.load(f))); } catch {}
+  canvas.width = W; canvas.height = H;
+  const ctx = canvas.getContext("2d");
+  const st = shareStats(), h = homeInfo(), name = displayName() || "Traveler";
+  const wide = opts.size === "wide", story = opts.size === "story";
+  const P = wide ? 56 : 72;
+
+  ctx.fillStyle = T.bg; ctx.fillRect(0, 0, W, H);
+  // Brand stripe in the continent colors, as on the site's title
+  const g = ctx.createLinearGradient(0, 0, W, 0);
+  ["NA", "SA", "EU", "AF", "AS", "OC"].forEach((k, i) => g.addColorStop(i / 5, T.c[k]));
+  ctx.fillStyle = g; ctx.fillRect(0, 0, W, 10);
+
+  // --- Text block ---
+  const textW = wide ? 440 : W - 2 * P;
+  let y = wide ? 104 : story ? 170 : 128;
+  ctx.textBaseline = "alphabetic"; ctx.fillStyle = T.ink;
+  const nameSize = wide ? 46 : story ? 72 : 60;
+  ctx.fillText(fitText(ctx, name, textW, nameSize, 700, DISPLAY), P, y);
+  const sub = [[h.state, h.name].filter(Boolean).join(", "), st.since ? `traveling since ${st.since}` : ""].filter(Boolean).join(" · ");
+  if (sub) { y += wide ? 40 : 52; ctx.fillStyle = T.muted; ctx.fillText(fitText(ctx, sub, textW, wide ? 22 : 30, 400, BODY), P, y); }
+
+  y += wide ? 110 : story ? 190 : 150;
+  const bigSize = wide ? 120 : story ? 200 : 160;
+  ctx.font = `700 ${bigSize}px ${DISPLAY}`; ctx.fillStyle = T.accent;
+  const num = String(st.visited.length);
+  ctx.fillText(num, P - 4, y);
+  const nw = ctx.measureText(num).width;
+  ctx.font = `700 ${wide ? 38 : story ? 60 : 50}px ${DISPLAY}`; ctx.fillStyle = T.ink;
+  ctx.fillText(st.visited.length === 1 ? "country" : "countries", P + nw + 18, y);
+  y += wide ? 44 : 60;
+  ctx.fillStyle = T.muted;
+  ctx.fillText(fitText(ctx, `${st.pct}% of the world · ${st.conts.length} of 7 continents`, textW, wide ? 24 : story ? 34 : 30, 400, BODY), P, y);
+
+  // --- Map ---
+  const geo = mapGeo;
+  let mx, my, mw, mh;
+  if (wide) { mx = 520; my = 60; mw = W - mx - 40; mh = H - my - 90; }
+  else { mx = P - 24; mw = W - 2 * mx; my = y + (story ? 90 : 56); mh = Math.min(mw * geo.H / geo.W, (story ? 640 : H - my - 120)); }
+  const k = Math.min(mw / geo.W, mh / geo.H);
+  const ox = mx + (mw - geo.W * k) / 2, oy = my + (mh - geo.H * k) / 2;
+  ctx.save();
+  ctx.translate(ox, oy); ctx.scale(k, k);
+  if (geo.sphere) { ctx.fillStyle = T.ocean; ctx.fill(new Path2D(geo.sphere)); }
+  else { ctx.fillStyle = T.ocean; rrect(ctx, 0, 0, geo.W, geo.H, 12 / k); ctx.fill(); }
+  ctx.lineJoin = "round";
+  const inertFill = T.land;
+  for (const c of mapGeo.list) {
+    if (c.dot) continue;
+    const code = eff(c.code), ck = contOf[code];
+    const inside = byCode[c.code] && !EXCLUDE.has(c.code);
+    const on = inside && isVisited(code);
+    ctx.fillStyle = !inside || !ck ? inertFill : on ? T.c[ck] : mixHex(T.c[ck], T.land, T.tint);
+    const p = new Path2D(c.d);
+    ctx.fill(p);
+    ctx.strokeStyle = T.ocean; ctx.lineWidth = .6 / k * 1.6; ctx.stroke(p);
+  }
+  // Small countries: only the visited ones get a dot, a little bigger so they show up
+  for (const c of countries.filter(c => c.dot && isVisited(eff(c.code)))) {
+    const m = /^M(-?[\d.]+),(-?[\d.]+)a([\d.]+)/.exec(c.d); if (!m) continue;
+    ctx.beginPath(); ctx.arc(+m[1] + +m[3], +m[2], 4.2, 0, 2 * Math.PI);
+    ctx.fillStyle = T.c[contOf[eff(c.code)]] || T.accent; ctx.fill();
+    ctx.lineWidth = 1.2; ctx.strokeStyle = T.bg; ctx.stroke();
+  }
+  ctx.restore();
+
+  // --- Continent counts (wide: under the number; story: under the map; square: no room, the line above covers it) ---
+  const contRows = CONT_AZ.map(k => ({ k, n: st.visited.filter(c => contOf[c.code] === k).length }));
+  let cy = wide ? y + 40 : my + mh + 70;
+  if (wide || story) {
+    const cols = wide ? 2 : story ? 2 : 4, cw = (wide ? textW : W - 2 * P) / cols, rowH = wide ? 34 : story ? 54 : 40;
+    const fs = wide ? 20 : story ? 30 : 24;
+    contRows.forEach((r, i) => {
+      const x = P + (i % cols) * cw, yy = cy + Math.floor(i / cols) * rowH;
+      ctx.beginPath(); ctx.arc(x + fs * .35, yy - fs * .32, fs * .32, 0, 2 * Math.PI);
+      ctx.fillStyle = r.n ? T.c[r.k] : mixHex(T.c[r.k], T.bg, .3); ctx.fill();
+      ctx.font = `400 ${fs}px ${BODY}`; ctx.fillStyle = r.n ? T.ink : T.muted;
+      const label = CONTINENTS[r.k][0], lw = ctx.measureText(label).width;
+      ctx.fillText(label, x + fs, yy);
+      ctx.font = `500 ${fs}px ${MONO}`;
+      ctx.fillText(String(r.n), x + fs + lw + fs * .45, yy);
+    });
+    cy += Math.ceil(contRows.length / cols) * rowH;
+  }
+
+  // --- Flags (story only: plenty of room) ---
+  if (story && withFlags && st.visited.length) {
+    const fw = 72, fh = 48, gap = 14, cols = Math.floor((W - 2 * P + gap) / (fw + gap));
+    const rows = Math.max(0, Math.floor((H - 150 - (cy + 30)) / (fh + gap)));
+    const cap = cols * rows;
+    const list = [...st.visited].sort((a, b) => a.name.localeCompare(b.name));
+    const shown = list.length > cap ? list.slice(0, cap - 1) : list;
+    const imgs = await Promise.all(shown.map(c => loadFlag(c.code)));
+    let fy = cy + 30;
+    shown.forEach((c, i) => {
+      const x = P + (i % cols) * (fw + gap), yy = fy + Math.floor(i / cols) * (fh + gap);
+      ctx.save(); rrect(ctx, x, yy, fw, fh, 6); ctx.clip();
+      if (imgs[i]) ctx.drawImage(imgs[i], x, yy, fw, fh);
+      else { ctx.fillStyle = mixHex(T.c[contOf[c.code]] || T.accent, T.bg, .35); ctx.fillRect(x, yy, fw, fh);
+             ctx.fillStyle = T.ink; ctx.font = `500 20px ${MONO}`; ctx.textAlign = "center"; ctx.fillText(c.code, x + fw / 2, yy + fh / 2 + 7); ctx.textAlign = "left"; }
+      ctx.restore();
+      rrect(ctx, x + .5, yy + .5, fw - 1, fh - 1, 6); ctx.strokeStyle = T.line; ctx.lineWidth = 1; ctx.stroke();
+    });
+    if (list.length > shown.length) {
+      const i = shown.length, x = P + (i % cols) * (fw + gap), yy = fy + Math.floor(i / cols) * (fh + gap);
+      rrect(ctx, x, yy, fw, fh, 6); ctx.fillStyle = T.ocean; ctx.fill();
+      ctx.fillStyle = T.ink; ctx.font = `600 20px ${BODY}`; ctx.textAlign = "center"; ctx.fillText(`+${list.length - shown.length}`, x + fw / 2, yy + fh / 2 + 7); ctx.textAlign = "left";
+    }
+  }
+
+  // --- Footer: made with Where I've Been ---
+  const fy = H - (wide ? 34 : story ? 70 : 52);
+  const fs = wide ? 18 : story ? 26 : 22;
+  ctx.font = `500 ${fs}px ${MONO}`; ctx.fillStyle = T.muted; ctx.textAlign = wide ? "left" : "center";
+  const fx = wide ? P : W / 2;
+  ctx.fillText("Made with Where I've Been · whereihavebeen.com", fx, fy);
+  ctx.textAlign = "left";
+}
+
+async function shareBlob(canvas) {
+  const toBlob = () => new Promise((res, rej) => { try { canvas.toBlob(b => b ? res(b) : rej(new Error("empty")), "image/png"); } catch (e) { rej(e); } });
+  try { return await toBlob(); }
+  catch { await drawShareCard(canvas, shareOpts, false); return toBlob(); }   // a flag image blocked export: redraw without flags
+}
+
+function openShare() {
+  if (!session) { showView("auth"); toast("Sign in first"); return; }
+  if (!mapGeo) { toast("The map is still loading"); return; }
+  selected = null; paintMap();
+  showView("detail");
+  const canvas = el("canvas", { class: "share-canvas", role: "img", "aria-label": "Preview of your map image" });
+  const seg = (key, choices) => el("div", { class: "share-seg", role: "group" }, ...choices.map(([v, label]) =>
+    el("button", { type: "button", "aria-pressed": String(shareOpts[key] === v), onclick: () => { shareOpts[key] = v; redraw(); } }, label)));
+  const sizeSeg = seg("size", Object.entries(SHARE_SIZES).map(([k, v]) => [k, v[2]]));
+  const themeSeg = seg("theme", [["light", "Light"], ["dark", "Dark"]]);
+  const canShareFiles = !!(navigator.canShare && navigator.share);
+  const shareBtn = el("button", { type: "button", class: "visit-btn on" }, "Share…");
+  const dlBtn = el("button", { type: "button", class: "visit-btn" + (canShareFiles ? "" : " on") }, "Download image");
+  const fileName = () => `where-ive-been-${shareOpts.size}.png`;
+  const text = () => { const n = listCountries.filter(c => isVisited(c.code)).length; return `I've been to ${n} ${n === 1 ? "country" : "countries"}! Map yours at https://whereihavebeen.com`; };
+  let busy = 0;
+  async function redraw() {
+    const me = ++busy;
+    [...sizeSeg.children].forEach((b, i) => b.setAttribute("aria-pressed", String(Object.keys(SHARE_SIZES)[i] === shareOpts.size)));
+    [...themeSeg.children].forEach((b, i) => b.setAttribute("aria-pressed", String(["light", "dark"][i] === shareOpts.theme)));
+    const off = document.createElement("canvas");
+    await drawShareCard(off, shareOpts);
+    if (me !== busy) return;
+    canvas.width = off.width; canvas.height = off.height;
+    canvas.getContext("2d").drawImage(off, 0, 0);
+    canvas.dataset.size = shareOpts.size;
+  }
+  dlBtn.onclick = async () => {
+    const blob = await shareBlob(canvas).catch(() => null);
+    if (!blob) { toast("Couldn't make the image. Try again."); return; }
+    const a = el("a", { href: URL.createObjectURL(blob), download: fileName() });
+    document.body.append(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+  };
+  shareBtn.onclick = async () => {
+    const blob = await shareBlob(canvas).catch(() => null);
+    if (!blob) { toast("Couldn't make the image. Try again."); return; }
+    const file = new File([blob], fileName(), { type: "image/png" });
+    try {
+      if (navigator.canShare({ files: [file] })) await navigator.share({ files: [file], text: text() });
+      else await navigator.share({ text: text(), url: "https://whereihavebeen.com" });
+    } catch (e) { if (e && e.name !== "AbortError") dlBtn.click(); }
+  };
+  $("detail").replaceChildren(
+    el("button", { type: "button", class: "back", onclick: closeDetail }, "← All countries"),
+    el("div", { class: "d-head" }, el("h2", { text: "Share your map" })),
+    el("p", { class: "hint", text: "An image of your map to post or send. It shows your screen name, home and country counts. Your email, trips and notes stay private." }),
+    el("div", { class: "share-opts" }, sizeSeg, themeSeg),
+    el("div", { class: "share-preview" }, canvas),
+    el("div", { class: "share-actions" }, canShareFiles ? shareBtn : null, dlBtn),
+    el("p", { class: "hint", text: "Change your screen name or home in Profile." }));
+  redraw();
+}
+$("shareBtn").addEventListener("click", openShare);
 
 /* ---------- Import a pasted list ---------- */
 const ALIASES = {
