@@ -332,7 +332,7 @@ details.more .more-body { display: grid; gap: 18px; padding: 4px 12px 14px; }
       <div class="tiles" id="tiles"></div>
       <ul class="conts" id="conts"></ul>
       <button type="button" class="badge-row" id="badgeRow" aria-label="See all badges"></button>
-      <div class="status" id="status"><span id="statusText"><i class="dot"></i>Connecting…</span><span style="display:flex;gap:12px;flex-wrap:wrap;justify-content:flex-end"><button type="button" class="linkbtn" id="importBtn">Import a list</button><button type="button" class="linkbtn" id="copyBtn">Copy my list</button><button type="button" class="linkbtn" id="profileBtn" hidden>Profile</button><button type="button" class="linkbtn" id="signOutBtn" hidden>Sign out</button><button type="button" class="linkbtn" id="helpBtn">Help</button></span></div>
+      <div class="status" id="status"><span id="statusText"><i class="dot"></i>Connecting…</span><span style="display:flex;gap:12px;flex-wrap:wrap;justify-content:flex-end"><button type="button" class="linkbtn" id="importBtn">Import a list</button><button type="button" class="linkbtn" id="copyBtn">Copy my list</button><button type="button" class="linkbtn" id="profileBtn" hidden>Profile</button><a class="linkbtn" id="adminLink" href="admin.html" hidden>Admin</a><button type="button" class="linkbtn" id="signOutBtn" hidden>Sign out</button><button type="button" class="linkbtn" id="helpBtn">Help</button></span></div>
     </div>
 
     <div class="view" id="listView" hidden>
@@ -412,7 +412,7 @@ details.more .more-body { display: grid; gap: 18px; padding: 4px 12px 14px; }
 "use strict";
 
 /* Bump on every change so it's easy to see which version is live. */
-const APP_VERSION = "v1.16 · Nov 13, 2026";
+const APP_VERSION = "v1.17 · Nov 15, 2026";
 
 /* ---------- Reference data ---------- */
 const CONTINENTS = {
@@ -1073,16 +1073,26 @@ function openProfile() {
 }
 $("profileBtn").onclick = openProfile;
 
+/* Admin link: only for accounts in the admins table (admin.sql). The admin page's data is
+   protected in the database; this only decides whether to show the link. */
+async function checkAdmin() {
+  $("adminLink").hidden = true;
+  if (!sb || !session) return;
+  const { data, error } = await sb.rpc("is_admin");
+  $("adminLink").hidden = !(!error && data === true && session);
+}
+
 function handleSession(s, event) {
   const prev = session && session.user.id;
   session = s;
   $("signOutBtn").hidden = !s;
   $("profileBtn").hidden = !s;
+  if (!s) $("adminLink").hidden = true;
   if (s && prev === s.user.id && P.mode === "cloud" && !pendingCodes().size) setStatus("ok", signedInText());
   if (event === "PASSWORD_RECOVERY") { setAuthMode("reset"); showView("auth"); return; }
   if (s) {
     linkErrorMsg = "";
-    if (prev !== s.user.id) setTimeout(loadRecords, 0);
+    if (prev !== s.user.id) { setTimeout(loadRecords, 0); checkAdmin(); }
   } else {
     records = {}; selected = null; rankInfo = null; earnedBefore = null; myProfile = null; Object.keys(boardCache).forEach(k => delete boardCache[k]); P.mode = "signedout";
     setStatus(null, "Not signed in");

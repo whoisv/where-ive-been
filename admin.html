@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Admin · Where I've Been</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* Admin console. Same look as the map (index.html). Data comes only from admin_overview()
+   in the database, which refuses anyone who isn't in the admins table (admin.sql). */
+:root {
+  --bg: #eef1f4; --surface: #ffffff; --ink: #18212b; --muted: #5b6978; --line: #d6dce3;
+  --accent: #1f56d6; --accent-hover: #1846b0; --accent-ink: #ffffff; --accent-soft: #dfe7fb;
+  --danger: #b42318; --good: #157f3b; --grid: #e6eaef;
+  --font-display: "Bricolage Grotesque", ui-sans-serif, system-ui, sans-serif;
+  --font-body: "IBM Plex Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0e1319; --surface: #151c24; --ink: #e6ebf1; --muted: #93a0ae; --line: #29333f;
+    --accent: #5b8cff; --accent-hover: #7ea5ff; --accent-ink: #0a1020; --accent-soft: #1c2945;
+    --danger: #ff8a7a; --good: #5fd08a; --grid: #212a35;
+    color-scheme: dark;
+  }
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: 15px; line-height: 1.45; }
+button, input, select { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+a { color: var(--accent); }
+.num { font-variant-numeric: tabular-nums; }
+
+.wrap { max-width: 1240px; margin: 0 auto; padding: 24px 20px 60px; }
+header { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 20px; }
+header h1 { font-family: var(--font-display); font-weight: 700; font-size: 34px; line-height: 1.05; margin: 0; }
+header h1 small { display: block; font-family: var(--font-mono); font-size: 12px; font-weight: 400; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin-bottom: 4px; }
+.when { font-size: 13px; color: var(--muted); }
+.actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.btn { border: 1px solid var(--line); background: var(--surface); border-radius: 8px; padding: 7px 12px; cursor: pointer; font-size: 14px; text-decoration: none; color: var(--ink); }
+.btn:hover { border-color: var(--muted); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.btn.primary:hover { background: var(--accent-hover); }
+
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 18px; }
+.card h2 { font-family: var(--font-display); font-weight: 700; font-size: 19px; margin: 0; }
+.card .head { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
+.card .sub { font-size: 13px; color: var(--muted); margin: 2px 0 0; }
+
+.msg { max-width: 520px; margin: 12vh auto; text-align: center; }
+.msg h2 { font-family: var(--font-display); font-size: 26px; margin: 0 0 8px; }
+.msg p { color: var(--muted); margin: 0 0 18px; }
+.msg code { font-family: var(--font-mono); font-size: 13px; background: var(--accent-soft); padding: 1px 5px; border-radius: 4px; }
+
+/* KPI tiles */
+.tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; margin-bottom: 16px; }
+.tile { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; }
+.tile .k { font-size: 13px; color: var(--muted); }
+.tile .v { font-family: var(--font-display); font-weight: 700; font-size: 30px; line-height: 1.15; font-variant-numeric: tabular-nums; }
+.tile .s { font-size: 12.5px; color: var(--muted); }
+.tile.hero { grid-column: span 2; }
+.tile.hero .v { font-size: 46px; color: var(--accent); }
+
+.grid2 { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+@media (max-width: 1000px) { .grid2 { grid-template-columns: 1fr 1fr; } .grid2 > :first-child { grid-column: 1 / -1; } }
+@media (max-width: 640px) { .grid2 { grid-template-columns: 1fr; } }
+
+/* Segmented control */
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.seg button { border: 0; background: transparent; padding: 5px 10px; font-size: 13px; cursor: pointer; color: var(--muted); }
+.seg button + button { border-left: 1px solid var(--line); }
+.seg button[aria-pressed="true"] { background: var(--accent-soft); color: var(--ink); font-weight: 600; }
+.ctrls { display: flex; gap: 8px; flex-wrap: wrap; }
+
+/* Chart */
+.chart { position: relative; }
+.chart svg { display: block; width: 100%; height: 240px; overflow: visible; }
+.chart .gridline { stroke: var(--grid); stroke-width: 1; }
+.chart .axis text { fill: var(--muted); font-family: var(--font-mono); font-size: 11px; }
+.chart .bar { fill: var(--accent); }
+.chart .bar.on { fill: var(--accent-hover); }
+.chart .line { fill: none; stroke: var(--accent); stroke-width: 2; }
+.chart .area { fill: var(--accent); opacity: .12; }
+.chart .hair { stroke: var(--muted); stroke-width: 1; stroke-dasharray: 3 3; }
+.chart .pt { fill: var(--accent); stroke: var(--surface); stroke-width: 2; }
+.tip { position: absolute; pointer-events: none; background: var(--ink); color: var(--bg); font-size: 12.5px; padding: 6px 9px; border-radius: 6px; white-space: nowrap; transform: translate(-50%, calc(-100% - 10px)); }
+.tip b { font-variant-numeric: tabular-nums; }
+.empty { color: var(--muted); font-size: 14px; padding: 30px 0; text-align: center; }
+
+/* Ranked lists */
+.rank { list-style: none; margin: 0; padding: 0; display: grid; gap: 7px; }
+.rank li { display: grid; gap: 4px; font-size: 13.5px; }
+.rank .row { display: grid; grid-template-columns: 22px minmax(0, 1fr) auto; gap: 8px; align-items: center; }
+.rank img { width: 22px; height: 15px; object-fit: cover; border-radius: 2px; box-shadow: 0 0 0 1px var(--line); }
+.rank .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rank .track { margin-left: 30px; height: 6px; border-radius: 3px; background: var(--grid); }
+.rank .fill { height: 100%; border-radius: 3px; background: var(--accent); }
+.rank .n { font-family: var(--font-mono); font-size: 12.5px; text-align: right; }
+.rank .ph { width: 22px; height: 15px; border-radius: 2px; background: var(--grid); }
+
+/* Users table */
+.tools { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.tools input[type=search] { border: 1px solid var(--line); background: var(--bg); border-radius: 8px; padding: 6px 10px; min-width: 0; width: 260px; max-width: 100%; }
+.tools select { border: 1px solid var(--line); background: var(--bg); border-radius: 8px; padding: 6px 8px; }
+.tablewrap { overflow-x: auto; margin: 0 -18px; padding: 0 18px; }
+table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+th { font-weight: 600; font-size: 12.5px; color: var(--muted); position: sticky; top: 0; background: var(--surface); }
+th button { all: unset; cursor: pointer; }
+th button:hover { color: var(--ink); }
+th[aria-sort] button::after { content: " ↓"; }
+th[aria-sort="ascending"] button::after { content: " ↑"; }
+td.r, th.r { text-align: right; font-variant-numeric: tabular-nums; }
+tbody tr:hover { background: var(--accent-soft); }
+.email { font-weight: 500; }
+.sn { color: var(--muted); font-size: 12.5px; display: block; }
+.pill { display: inline-block; font-size: 11.5px; padding: 1px 7px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); }
+.pill.yes { color: var(--good); border-color: currentColor; }
+.pill.no { color: var(--danger); border-color: currentColor; }
+.pill.me { color: var(--accent); border-color: currentColor; }
+.dim { color: var(--muted); }
+.count { font-size: 13px; color: var(--muted); margin-top: 10px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1><small>Where I've Been</small>Admin console</h1>
+    <div class="actions">
+      <span class="when" id="when"></span>
+      <button class="btn" id="refreshBtn" type="button" hidden>Refresh</button>
+      <button class="btn" id="csvBtn" type="button" hidden>Download CSV</button>
+      <a class="btn" href="./">Back to the map</a>
+    </div>
+  </header>
+
+  <div class="msg" id="msg"><h2>Loading…</h2></div>
+
+  <main id="dash" hidden>
+    <section class="tiles" id="tiles" aria-label="Key numbers"></section>
+
+    <section class="grid2">
+      <div class="card">
+        <div class="head">
+          <div><h2 id="chartTitle">Sign-ups</h2><p class="sub" id="chartSub"></p></div>
+          <div class="ctrls">
+            <div class="seg" id="rangeSeg" role="group" aria-label="Time range">
+              <button type="button" data-v="30">30 days</button><button type="button" data-v="90">90 days</button><button type="button" data-v="365">1 year</button><button type="button" data-v="all">All</button>
+            </div>
+            <div class="seg" id="modeSeg" role="group" aria-label="Show">
+              <button type="button" data-v="new">New</button><button type="button" data-v="total">Running total</button>
+            </div>
+          </div>
+        </div>
+        <div class="chart" id="chart"></div>
+      </div>
+      <div class="card"><div class="head"><div><h2>Most visited</h2><p class="sub">Travelers who've been to each country</p></div></div><ul class="rank" id="topCountries"></ul></div>
+      <div class="card"><div class="head"><div><h2>Home countries</h2><p class="sub">Where travelers say they live</p></div></div><ul class="rank" id="homeCountries"></ul></div>
+    </section>
+
+    <section class="card">
+      <div class="head">
+        <div><h2>Travelers</h2><p class="sub">Everyone with an account, newest first. Click a column to sort.</p></div>
+        <div class="tools">
+          <input type="search" id="q" placeholder="Search email, screen name or home" aria-label="Search travelers">
+          <select id="filter" aria-label="Filter travelers">
+            <option value="all">Everyone</option>
+            <option value="confirmed">Email confirmed</option>
+            <option value="unconfirmed">Not confirmed</option>
+            <option value="community">Community members</option>
+            <option value="active">Active in last 30 days</option>
+            <option value="empty">No countries yet</option>
+          </select>
+        </div>
+      </div>
+      <div class="tablewrap">
+        <table>
+          <thead><tr id="thead"></tr></thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
+      <div class="count" id="count"></div>
+    </section>
+  </main>
+</div>
+
+<script src="config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script>
+"use strict";
+const $ = id => document.getElementById(id);
+function el(tag, attrs = {}, ...kids) {
+  const n = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) {
+    if (v == null || v === false) continue;
+    if (k === "class") n.className = v; else if (k === "text") n.textContent = v; else n.setAttribute(k, v === true ? "" : v);
+  }
+  for (const k of kids.flat()) if (k != null) n.append(k);
+  return n;
+}
+const SVGNS = "http://www.w3.org/2000/svg";
+function sv(tag, attrs = {}) { const n = document.createElementNS(SVGNS, tag); for (const [k, v] of Object.entries(attrs)) n.setAttribute(k, v); return n; }
+
+const fmt = n => Number(n || 0).toLocaleString();
+let regionNames; try { regionNames = new Intl.DisplayNames(["en"], { type: "region" }); } catch (e) {}
+const countryName = code => { if (!code || code === "—") return "Not set"; try { return regionNames ? regionNames.of(code) : code; } catch (e) { return code; } };
+const dateFmt = new Intl.DateTimeFormat(undefined, { year: "numeric", month: "short", day: "numeric" });
+const dateTimeFmt = new Intl.DateTimeFormat(undefined, { year: "numeric", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+function ago(iso) {
+  if (!iso) return "—";
+  const s = (Date.now() - new Date(iso)) / 1000;
+  if (s < 60) return "just now";
+  if (s < 3600) return `${Math.floor(s / 60)}m ago`;
+  if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
+  if (s < 86400 * 30) return `${Math.floor(s / 86400)}d ago`;
+  return dateFmt.format(new Date(iso));
+}
+
+function showMsg(title, text, link) {
+  $("dash").hidden = true; $("refreshBtn").hidden = true; $("csvBtn").hidden = true;
+  $("msg").hidden = false;
+  $("msg").replaceChildren(el("h2", { text: title }), el("p", {}, ...(Array.isArray(text) ? text : [text])),
+    link ? el("a", { class: "btn primary", href: link.href, text: link.text }) : "");
+}
+
+/* ---------- Connect ---------- */
+const cfg = window.APP_CONFIG || {};
+let sb, me, data;
+let range = "90", mode = "new", sortKey = "created_at", sortDir = -1;
+
+async function start() {
+  if (!cfg.SUPABASE_URL || !cfg.SUPABASE_ANON_KEY || !window.supabase) {
+    return showMsg("Not connected", "The app isn't connected to its database (check config.js).");
+  }
+  sb = window.supabase.createClient(cfg.SUPABASE_URL.replace(/\/+$/, "").replace(/\/rest\/v1$/, ""), cfg.SUPABASE_ANON_KEY);
+  const { data: { session } } = await sb.auth.getSession();
+  if (!session) return showMsg("Sign in first", "Sign in on the map with your admin account, then come back to this page.", { href: "./", text: "Go to sign in" });
+  me = session.user.id;
+  await load();
+}
+
+async function load() {
+  $("refreshBtn").disabled = true;
+  const { data: d, error } = await sb.rpc("admin_overview");
+  $("refreshBtn").disabled = false;
+  if (error) {
+    const m = (error.message || "") + " " + (error.code || "");
+    if (/not authorized|42501/i.test(m)) return showMsg("Admins only", "This page is only for the site's admin.", { href: "./", text: "Back to the map" });
+    if (/admin_overview|PGRST202|42883|does not exist/i.test(m)) return showMsg("Not set up yet", ["Run ", el("code", { text: "admin.sql" }), " in Supabase's SQL Editor (put your email in it first), then refresh."]);
+    return showMsg("Couldn't load", "Something went wrong loading the numbers. Refresh to try again.");
+  }
+  data = d;
+  $("msg").hidden = true; $("dash").hidden = false; $("refreshBtn").hidden = false; $("csvBtn").hidden = false;
+  $("when").textContent = `Updated ${dateTimeFmt.format(new Date(d.generated_at))}`;
+  renderTiles(); renderChart(); renderRank("topCountries", d.top_countries, true); renderRank("homeCountries", d.home_countries, false); renderTable();
+}
+
+/* ---------- Tiles ---------- */
+function renderTiles() {
+  const t = data.totals, pct = (a, b) => b ? `${Math.round(100 * a / b)}% of sign-ups` : "";
+  const tiles = [
+    ["Total sign-ups", fmt(t.users), `${fmt(t.confirmed)} confirmed their email`, true],
+    ["New this week", fmt(t.new_7d), `${fmt(t.new_30d)} in the last 30 days`],
+    ["Active this week", fmt(t.active_7d), `${fmt(t.active_30d)} in the last 30 days`],
+    ["Marked a country", fmt(t.with_countries), pct(t.with_countries, t.users)],
+    ["Community members", fmt(t.community), pct(t.community, t.users)],
+    ["Countries per traveler", t.avg_countries, "average, among those who marked any"],
+    ["Countries marked", fmt(t.countries_marked), "across everyone"],
+    ["Trips logged", fmt(t.trips_logged), "with dates"],
+    ["Google sign-ins", fmt(t.google), `${fmt(t.users - t.google)} by email`]
+  ];
+  $("tiles").replaceChildren(...tiles.map(([k, v, s, hero]) =>
+    el("div", { class: "tile" + (hero ? " hero" : "") }, el("div", { class: "k", text: k }), el("div", { class: "v", text: String(v) }), el("div", { class: "s", text: s }))));
+}
+
+/* ---------- Sign-ups chart ---------- */
+function series() {
+  const all = data.signups_by_day.map(r => ({ day: r.day, n: Number(r.n) }));
+  let running = 0; all.forEach(r => { running += r.n; r.total = running; });
+  const days = range === "all" ? all : all.slice(-Number(range));
+  // Group by week once the window is longer than ~45 days, so bars stay readable.
+  if (days.length <= 45) return { rows: days.map(r => ({ label: r.day, from: r.day, to: r.day, n: r.n, total: r.total })), unit: "day" };
+  const out = [];
+  for (let i = 0; i < days.length; i += 7) {
+    const chunk = days.slice(i, i + 7);
+    out.push({ label: chunk[0].day, from: chunk[0].day, to: chunk[chunk.length - 1].day, n: chunk.reduce((a, r) => a + r.n, 0), total: chunk[chunk.length - 1].total });
+  }
+  return { rows: out, unit: "week" };
+}
+const shortDate = s => new Date(s + "T00:00:00").toLocaleDateString(undefined, { month: "short", day: "numeric" });
+const longDate = s => new Date(s + "T00:00:00").toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+
+function niceMax(v) { if (v <= 4) return 4; const p = Math.pow(10, Math.floor(Math.log10(v))); for (const m of [1, 2, 2.5, 5, 10]) if (m * p >= v) return m * p; return 10 * p; }
+
+function renderChart() {
+  for (const b of $("rangeSeg").children) b.setAttribute("aria-pressed", b.dataset.v === range);
+  for (const b of $("modeSeg").children) b.setAttribute("aria-pressed", b.dataset.v === mode);
+  const { rows, unit } = series();
+  const box = $("chart");
+  const inWindow = rows.reduce((a, r) => a + r.n, 0);
+  $("chartTitle").textContent = mode === "new" ? `New sign-ups per ${unit}` : "Total sign-ups over time";
+  $("chartSub").textContent = mode === "new" ? `${fmt(inWindow)} in this period` : `${fmt(rows.length ? rows[rows.length - 1].total : 0)} total`;
+  if (!rows.length) { box.replaceChildren(el("div", { class: "empty", text: "No sign-ups yet." })); return; }
+
+  const W = Math.max(box.clientWidth || 600, 280), H = 240, m = { t: 10, r: 8, b: 26, l: 40 };
+  const iw = W - m.l - m.r, ih = H - m.t - m.b;
+  const val = r => mode === "new" ? r.n : r.total;
+  const max = niceMax(Math.max(1, ...rows.map(val)));
+  const y = v => m.t + ih - (v / max) * ih;
+  const svg = sv("svg", { viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": $("chartTitle").textContent });
+  svg.style.height = H + "px";
+
+  const ticks = [4, 5, 2, 3].find(t => max % t === 0) || 4, g = sv("g", { class: "axis" });
+  for (let i = 0; i <= ticks; i++) {
+    const v = (max / ticks) * i, yy = y(v);
+    svg.append(sv("line", { class: "gridline", x1: m.l, x2: W - m.r, y1: yy, y2: yy }));
+    const t = sv("text", { x: m.l - 8, y: yy + 4, "text-anchor": "end" }); t.textContent = fmt(Math.round(v * 10) / 10); g.append(t);
+  }
+  const step = iw / rows.length;
+  const labelEvery = Math.max(1, Math.ceil(rows.length / Math.floor(iw / 70)));
+  rows.forEach((r, i) => {
+    if (i % labelEvery) return;
+    const t = sv("text", { x: m.l + step * i + step / 2, y: H - 6, "text-anchor": "middle" }); t.textContent = shortDate(r.label); g.append(t);
+  });
+  svg.append(g);
+
+  const marks = [];
+  if (mode === "new") {
+    const bw = Math.max(1, Math.min(28, step - 2)), rad = Math.min(4, bw / 2);
+    rows.forEach((r, i) => {
+      const x = m.l + step * i + (step - bw) / 2, h = (r.n / max) * ih;
+      if (h <= 0) { marks.push(null); return; }
+      // Bar with rounded top only, anchored on the baseline.
+      const top = m.t + ih - h, rr = Math.min(rad, h);
+      const p = sv("path", { class: "bar", d: `M${x},${m.t + ih}V${top + rr}Q${x},${top} ${x + rr},${top}H${x + bw - rr}Q${x + bw},${top} ${x + bw},${top + rr}V${m.t + ih}Z` });
+      svg.append(p); marks.push(p);
+    });
+  } else {
+    const pts = rows.map((r, i) => [m.l + step * i + step / 2, y(r.total)]);
+    svg.append(sv("path", { class: "area", d: `M${pts[0][0]},${m.t + ih}` + pts.map(p => `L${p[0]},${p[1]}`).join("") + `L${pts[pts.length - 1][0]},${m.t + ih}Z` }));
+    svg.append(sv("path", { class: "line", d: pts.map((p, i) => (i ? "L" : "M") + p[0] + "," + p[1]).join("") }));
+  }
+  const hair = sv("line", { class: "hair", y1: m.t, y2: m.t + ih, visibility: "hidden" });
+  const dot = sv("circle", { class: "pt", r: 4.5, visibility: "hidden" });
+  svg.append(hair, dot);
+  const hit = sv("rect", { x: m.l, y: m.t, width: iw, height: ih, fill: "transparent" });
+  svg.append(hit);
+
+  const tip = el("div", { class: "tip", hidden: true });
+  let on = null;
+  const hide = () => { tip.hidden = true; hair.setAttribute("visibility", "hidden"); dot.setAttribute("visibility", "hidden"); if (on) on.classList.remove("on"); on = null; };
+  hit.addEventListener("pointermove", e => {
+    const rect = svg.getBoundingClientRect(), sx = (e.clientX - rect.left) * (W / rect.width);
+    const i = Math.max(0, Math.min(rows.length - 1, Math.floor((sx - m.l) / step)));
+    const r = rows[i], cx = m.l + step * i + step / 2;
+    if (on) on.classList.remove("on");
+    on = marks[i] || null; if (on) on.classList.add("on");
+    if (mode === "total") { hair.setAttribute("x1", cx); hair.setAttribute("x2", cx); hair.setAttribute("visibility", "visible"); dot.setAttribute("cx", cx); dot.setAttribute("cy", y(r.total)); dot.setAttribute("visibility", "visible"); }
+    const when = r.from === r.to ? longDate(r.from) : `${shortDate(r.from)} – ${longDate(r.to)}`;
+    tip.replaceChildren(when + " · ", el("b", { text: mode === "new" ? `${fmt(r.n)} new` : `${fmt(r.total)} total` }));
+    tip.hidden = false;
+    tip.style.left = (cx / W) * rect.width + "px";
+    tip.style.top = (y(val(r)) / H) * rect.height + "px";
+  });
+  hit.addEventListener("pointerleave", hide);
+  box.replaceChildren(svg, tip);
+}
+$("rangeSeg").onclick = e => { const v = e.target.dataset && e.target.dataset.v; if (v) { range = v; renderChart(); } };
+$("modeSeg").onclick = e => { const v = e.target.dataset && e.target.dataset.v; if (v) { mode = v; renderChart(); } };
+let rz; window.addEventListener("resize", () => { clearTimeout(rz); rz = setTimeout(() => data && renderChart(), 150); });
+
+/* ---------- Ranked lists ---------- */
+function renderRank(id, rows, isCountry) {
+  const list = $(id);
+  if (!rows.length) { list.replaceChildren(el("li", { class: "empty", text: "Nothing yet." })); return; }
+  const max = Math.max(...rows.map(r => Number(r.n)));
+  list.replaceChildren(...rows.map(r => {
+    const ok = r.code && r.code !== "—" && /^[A-Z]{2}$/.test(r.code);
+    const flag = ok ? el("img", { src: `https://flagcdn.com/w40/${r.code.toLowerCase()}.png`, alt: "", loading: "lazy" }) : el("span", { class: "ph" });
+    const fill = el("div", { class: "fill" }); fill.style.width = (100 * r.n / max) + "%";
+    return el("li", {}, el("div", { class: "row" }, flag, el("span", { class: "nm", text: countryName(r.code) }), el("span", { class: "n", text: fmt(r.n) })), el("div", { class: "track" }, fill));
+  }));
+}
+
+/* ---------- Users table ---------- */
+const COLS = [
+  { key: "email", label: "Traveler" },
+  { key: "created_at", label: "Signed up" },
+  { key: "last_sign_in_at", label: "Last sign-in" },
+  { key: "last_activity", label: "Last change" },
+  { key: "email_confirmed_at", label: "Email" },
+  { key: "provider", label: "Sign-in" },
+  { key: "home", label: "Home" },
+  { key: "is_public", label: "Community" },
+  { key: "countries", label: "Countries", num: true },
+  { key: "continents", label: "Continents", num: true },
+  { key: "trips", label: "Trips", num: true },
+  { key: "notes", label: "Notes", num: true }
+];
+function filtered() {
+  const q = $("q").value.trim().toLowerCase(), f = $("filter").value;
+  const month = Date.now() - 30 * 86400000;
+  let rows = data.users.filter(u => {
+    if (q && ![u.email, u.screen_name, u.home].some(v => (v || "").toLowerCase().includes(q))) return false;
+    if (f === "confirmed") return !!u.email_confirmed_at;
+    if (f === "unconfirmed") return !u.email_confirmed_at;
+    if (f === "community") return u.is_public;
+    if (f === "empty") return !u.countries;
+    if (f === "active") return [u.last_sign_in_at, u.last_activity].some(d => d && new Date(d) > month);
+    return true;
+  });
+  const k = sortKey;
+  rows.sort((a, b) => {
+    let x = a[k], y = b[k];
+    if (x == null || x === "") return 1; if (y == null || y === "") return -1;
+    if (typeof x === "boolean") { x = +x; y = +y; }
+    return (x < y ? -1 : x > y ? 1 : 0) * sortDir;
+  });
+  return rows;
+}
+function renderTable() {
+  $("thead").replaceChildren(...COLS.map(c => {
+    const th = el("th", { class: c.num ? "r" : null, scope: "col" }, el("button", { type: "button", text: c.label }));
+    if (c.key === sortKey) th.setAttribute("aria-sort", sortDir > 0 ? "ascending" : "descending");
+    th.firstChild.onclick = () => { if (sortKey === c.key) sortDir = -sortDir; else { sortKey = c.key; sortDir = (c.num || /_at$|activity/.test(c.key)) ? -1 : 1; } renderTable(); };
+    return th;
+  }));
+  const rows = filtered();
+  const time = iso => iso ? el("span", { title: dateTimeFmt.format(new Date(iso)), text: ago(iso) }) : el("span", { class: "dim", text: "—" });
+  $("tbody").replaceChildren(...rows.map(u => el("tr", {},
+    el("td", {}, el("span", { class: "email", text: u.email || "(no email)" }), " ",
+      u.id === me ? el("span", { class: "pill me", text: "you" }) : u.is_admin ? el("span", { class: "pill me", text: "admin" }) : "",
+      u.screen_name && u.screen_name !== u.email ? el("span", { class: "sn", text: u.screen_name }) : ""),
+    el("td", { title: dateTimeFmt.format(new Date(u.created_at)), text: dateFmt.format(new Date(u.created_at)) }),
+    el("td", {}, time(u.last_sign_in_at)),
+    el("td", {}, time(u.last_activity)),
+    el("td", {}, u.email_confirmed_at ? el("span", { class: "pill yes", text: "Confirmed" }) : el("span", { class: "pill no", text: "Not confirmed" })),
+    el("td", { text: u.provider === "google" ? "Google" : u.provider === "email" ? "Email" : u.provider }),
+    el("td", { class: u.home ? null : "dim", text: u.home || "—" }),
+    el("td", {}, u.is_public ? el("span", { class: "pill yes", text: "Member" }) : el("span", { class: "dim", text: "—" })),
+    el("td", { class: "r", text: fmt(u.countries) }),
+    el("td", { class: "r", text: fmt(u.continents) }),
+    el("td", { class: "r", text: fmt(u.trips) }),
+    el("td", { class: "r", text: fmt(u.notes) })
+  )));
+  if (!rows.length) $("tbody").append(el("tr", {}, el("td", { colspan: COLS.length, class: "empty", text: "No travelers match." })));
+  $("count").textContent = rows.length === data.users.length ? `${fmt(rows.length)} travelers` : `Showing ${fmt(rows.length)} of ${fmt(data.users.length)} travelers`;
+}
+$("q").oninput = () => renderTable();
+$("filter").onchange = () => renderTable();
+
+/* ---------- CSV ---------- */
+$("csvBtn").onclick = () => {
+  const cols = ["email", "screen_name", "created_at", "email_confirmed_at", "last_sign_in_at", "last_activity", "provider", "home", "home_country", "is_public", "countries", "continents", "trips", "notes"];
+  const esc = v => { v = v == null ? "" : String(v); if (/^[=+\-@]/.test(v)) v = "'" + v; return /[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v; };
+  const csv = [cols.join(","), ...filtered().map(u => cols.map(c => esc(u[c])).join(","))].join("\n");
+  const a = el("a", { href: URL.createObjectURL(new Blob([csv], { type: "text/csv" })), download: `travelers-${new Date().toISOString().slice(0, 10)}.csv` });
+  document.body.append(a); a.click(); a.remove();
+};
+$("refreshBtn").onclick = load;
+
+start();
+</script>
+</body>
+</html>

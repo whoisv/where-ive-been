@@ -68,6 +68,8 @@ flowchart LR
 | `add-first-year.sql` | Adds the optional "Year first visited" column and updates the this-year leaderboard. Run once. |
 | `delete-account.sql` | Lets users delete their own account and all their data from Profile. Run once. |
 | `leaderboard.sql` | Public profiles (opt-in), the country-to-continent table, the `leaderboard()` function and percentile. Run once. |
+| `admin.sql` | Admin console: the `admins` list, `is_admin()` and `admin_overview()`. Put your email in it, then run once. |
+| `admin.html` | The admin console (whereihavebeen.com/admin.html): sign-ups over time, key numbers and the full traveler list. Admins only. |
 
 ## Data model
 
@@ -157,4 +159,5 @@ Saved countries and accounts live in Supabase, so redeploying never touches them
 | No rank tile | Run `stats.sql` in the SQL Editor |
 | "Account deletion isn't set up yet" | Run `delete-account.sql` in the SQL Editor |
 | "Leaderboards aren't set up yet" | Run `leaderboard.sql` in the SQL Editor, then refresh |
+| Admin page says "Not set up yet" or "Admins only" | Put your email in `admin.sql` and run it in the SQL Editor. Sign in on the map with that same email first. |
 | A country page stays on "Loading…" | The World Bank or Wikipedia didn't answer. Refresh, or try again later. |
