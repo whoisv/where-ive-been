@@ -71,6 +71,7 @@ flowchart LR
 | `leaderboard.sql` | Public profiles (opt-in), the country-to-continent table, the `leaderboard()` function and percentile. Run once. |
 | `admin.sql` | Admin console: the `admins` list, `is_admin()` and `admin_overview()`. Put your email in it, then run once. |
 | `admin.html` | The admin console (whereihavebeen.com/admin.html): sign-ups over time, key numbers and the full traveler list. Admins only. |
+| `admin-access.sql` | "Give access" in the admin console: look up an email, or set a temporary password. Run after admin.sql. |
 
 ## Data model
 

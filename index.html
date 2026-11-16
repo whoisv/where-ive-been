@@ -440,7 +440,7 @@ details.more .more-body { display: grid; gap: 18px; padding: 4px 12px 14px; }
 "use strict";
 
 /* Bump on every change so it's easy to see which version is live. */
-const APP_VERSION = "v1.19 · Nov 15, 2026";
+const APP_VERSION = "v1.20 · Nov 16, 2026";
 
 /* ---------- Reference data ---------- */
 const CONTINENTS = {
@@ -901,7 +901,7 @@ $("authForm").addEventListener("submit", async e => {
   btn.textContent = authMode === "signup" ? "Creating account…" : authMode === "reset" ? "Saving…" : "Signing in…";
   try {
     if (authMode === "reset") {
-      const { error } = await sb.auth.updateUser({ password });
+      const { error } = await sb.auth.updateUser({ password, data: { must_change_password: false } });
       if (error) throw error;
       setAuthMode("signin");          // leave reset mode so the map opens
       $("password").value = "";
@@ -1119,6 +1119,14 @@ function handleSession(s, event) {
   if (!s) $("adminLink").hidden = true;
   if (s && prev === s.user.id && P.mode === "cloud" && !pendingCodes().size) setStatus("ok", signedInText());
   if (event === "PASSWORD_RECOVERY") { setAuthMode("reset"); showView("auth"); return; }
+  // Accounts the admin set up (sign-in link or temporary password) choose their own password first.
+  if (s && authMode !== "reset" && s.user.user_metadata && s.user.user_metadata.must_change_password) {
+    setAuthMode("reset");
+    $("authTitle").textContent = "Choose your password";
+    $("authLead").textContent = "Welcome to Where I've Been! Pick a password so you can sign in any time.";
+    showView("auth");
+    return;
+  }
   if (s) {
     linkErrorMsg = "";
     if (prev !== s.user.id) { setTimeout(loadRecords, 0); checkAdmin(); }

@@ -125,6 +125,31 @@ tbody tr:hover { background: var(--accent-soft); }
 .pill.me { color: var(--accent); border-color: currentColor; }
 .dim { color: var(--muted); }
 .count { font-size: 13px; color: var(--muted); margin-top: 10px; }
+button.pill { cursor: pointer; background: transparent; font: inherit; font-size: 11.5px; }
+button.pill.no:hover { background: var(--danger); color: var(--surface); border-color: var(--danger); }
+
+/* Give access dialog */
+dialog.ga { border: 0; padding: 0; border-radius: 14px; background: var(--surface); color: var(--ink); width: min(500px, calc(100vw - 32px)); box-shadow: 0 20px 60px rgba(0,0,0,.35); }
+dialog.ga::backdrop { background: rgba(10,16,24,.55); }
+.ga-top { display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; border-bottom: 1px solid var(--line); }
+.ga-top h2 { font-family: var(--font-display); font-weight: 700; font-size: 22px; margin: 0; }
+.ga-x { width: 34px; height: 34px; border-radius: 50%; border: 0; background: var(--bg); cursor: pointer; color: var(--muted); }
+.ga-body { padding: 18px 20px 20px; display: grid; gap: 14px; }
+.ga-body p { margin: 0; }
+.ga-row { display: flex; gap: 8px; }
+.ga-row input { flex: 1; min-width: 0; border: 1px solid var(--line); background: var(--bg); border-radius: 8px; padding: 9px 11px; }
+.ga-found { border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; background: var(--bg); font-size: 14px; display: grid; gap: 4px; }
+.ga-found b { font-weight: 600; }
+.ga-actions { display: grid; gap: 8px; }
+.ga-actions .btn { padding: 10px 12px; text-align: center; }
+.ga-link { all: unset; cursor: pointer; color: var(--accent); font-size: 13.5px; text-decoration: underline; justify-self: start; }
+.ga-ok { color: var(--good); font-weight: 600; }
+.ga-err { color: var(--danger); }
+.ga-pw { font-family: var(--font-mono); font-size: 20px; font-weight: 500; letter-spacing: .02em; background: var(--accent-soft); border-radius: 8px; padding: 10px 12px; text-align: center; user-select: all; }
+.ga-msg { width: 100%; min-height: 120px; border: 1px solid var(--line); background: var(--bg); border-radius: 8px; padding: 10px; font: inherit; font-size: 13.5px; resize: vertical; color: var(--ink); }
+.ga-share { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.ga-share .btn { text-align: center; }
+.hint { font-size: 13px; color: var(--muted); }
 </style>
 </head>
 <body>
@@ -133,6 +158,7 @@ tbody tr:hover { background: var(--accent-soft); }
     <h1><small>Where I've Been</small>Admin console</h1>
     <div class="actions">
       <span class="when" id="when"></span>
+      <button class="btn primary" id="giveBtn" type="button" hidden>Give access</button>
       <button class="btn" id="refreshBtn" type="button" hidden>Refresh</button>
       <button class="btn" id="csvBtn" type="button" hidden>Download CSV</button>
       <a class="btn" href="./">Back to the map</a>
@@ -189,6 +215,8 @@ tbody tr:hover { background: var(--accent-soft); }
   </main>
 </div>
 
+<dialog class="ga" id="gaDlg" aria-labelledby="gaTitle"></dialog>
+
 <script src="config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <script>
@@ -222,7 +250,7 @@ function ago(iso) {
 }
 
 function showMsg(title, text, link) {
-  $("dash").hidden = true; $("refreshBtn").hidden = true; $("csvBtn").hidden = true;
+  $("dash").hidden = true; $("refreshBtn").hidden = true; $("csvBtn").hidden = true; $("giveBtn").hidden = true;
   $("msg").hidden = false;
   $("msg").replaceChildren(el("h2", { text: title }), el("p", {}, ...(Array.isArray(text) ? text : [text])),
     link ? el("a", { class: "btn primary", href: link.href, text: link.text }) : "");
@@ -237,7 +265,8 @@ async function start() {
   if (!cfg.SUPABASE_URL || !cfg.SUPABASE_ANON_KEY || !window.supabase) {
     return showMsg("Not connected", "The app isn't connected to its database (check config.js).");
   }
-  sb = window.supabase.createClient(cfg.SUPABASE_URL.replace(/\/+$/, "").replace(/\/rest\/v1$/, ""), cfg.SUPABASE_ANON_KEY);
+  // implicit flow: links emailed from here must work on the recipient's own device, not this browser
+  sb = window.supabase.createClient(cfg.SUPABASE_URL.replace(/\/+$/, "").replace(/\/rest\/v1$/, ""), cfg.SUPABASE_ANON_KEY, { auth: { flowType: "implicit" } });
   const { data: { session } } = await sb.auth.getSession();
   if (!session) return showMsg("Sign in first", "Sign in on the map with your admin account, then come back to this page.", { href: "./", text: "Go to sign in" });
   me = session.user.id;
@@ -255,7 +284,7 @@ async function load() {
     return showMsg("Couldn't load", "Something went wrong loading the numbers. Refresh to try again.");
   }
   data = d;
-  $("msg").hidden = true; $("dash").hidden = false; $("refreshBtn").hidden = false; $("csvBtn").hidden = false;
+  $("msg").hidden = true; $("dash").hidden = false; $("refreshBtn").hidden = false; $("csvBtn").hidden = false; $("giveBtn").hidden = false;
   $("when").textContent = `Updated ${dateTimeFmt.format(new Date(d.generated_at))}`;
   renderTiles(); renderChart(); renderRank("topCountries", d.top_countries, true); renderRank("homeCountries", d.home_countries, false); renderTable();
 }
@@ -439,7 +468,8 @@ function renderTable() {
     el("td", { title: dateTimeFmt.format(new Date(u.created_at)), text: dateFmt.format(new Date(u.created_at)) }),
     el("td", {}, time(u.last_sign_in_at)),
     el("td", {}, time(u.last_activity)),
-    el("td", {}, u.email_confirmed_at ? el("span", { class: "pill yes", text: "Confirmed" }) : el("span", { class: "pill no", text: "Not confirmed" })),
+    el("td", {}, u.email_confirmed_at ? el("span", { class: "pill yes", text: "Confirmed" })
+      : Object.assign(el("button", { type: "button", class: "pill no", title: "Give this person access", text: "Not confirmed" }), { onclick: () => openGive(u.email) })),
     el("td", { text: u.provider === "google" ? "Google" : u.provider === "email" ? "Email" : u.provider }),
     el("td", { class: u.home ? null : "dim", text: u.home || "—" }),
     el("td", {}, u.is_public ? el("span", { class: "pill yes", text: "Member" }) : el("span", { class: "dim", text: "—" })),
@@ -463,6 +493,106 @@ $("csvBtn").onclick = () => {
   document.body.append(a); a.click(); a.remove();
 };
 $("refreshBtn").onclick = load;
+
+/* ---------- Give access ----------
+   Emails go out through Supabase Auth, which uses the site's own email service (Resend via SMTP):
+   - no account yet       → create it and email a sign-in link (they choose a password after signing in)
+   - account, unconfirmed → re-send the confirmation email
+   - account, confirmed   → email a password-reset link
+   Backup: set a temporary password (admin-access.sql) and send it yourself. */
+const SITE = "https://whereihavebeen.com/";   // links in emails always go to the live site
+function openGive(prefill = "") {
+  const dlg = $("gaDlg");
+  const input = el("input", { type: "email", placeholder: "name@example.com", "aria-label": "Email address", autocomplete: "off" });
+  input.value = prefill || "";
+  const checkBtn = el("button", { type: "submit", class: "btn primary", text: "Check" });
+  const out = el("div", { class: "ga-body", style: "padding:0" });
+  const form = el("form", { class: "ga-row" }, input, checkBtn);
+  dlg.replaceChildren(
+    el("div", { class: "ga-top" }, el("h2", { id: "gaTitle", text: "Give access" }),
+      Object.assign(el("button", { type: "button", class: "ga-x", "aria-label": "Close", text: "✕" }), { onclick: () => dlg.close() })),
+    el("div", { class: "ga-body" },
+      el("p", { class: "hint", text: "Type their email. I'll check whether they already have an account, then email them what they need to get in." }),
+      form, out));
+  dlg.onclick = e => { if (e.target === dlg) dlg.close(); };
+  dlg.onclose = () => { if (dlg.dataset.changed) { delete dlg.dataset.changed; load(); } };
+  form.onsubmit = async e => {
+    e.preventDefault();
+    const email = input.value.trim().toLowerCase();
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { out.replaceChildren(el("p", { class: "ga-err", text: "That doesn't look like an email address." })); return; }
+    checkBtn.disabled = true; out.replaceChildren(el("p", { class: "hint", text: "Checking…" }));
+    const { data: f, error } = await sb.rpc("admin_lookup_email", { target_email: email });
+    checkBtn.disabled = false;
+    if (error) {
+      out.replaceChildren(el("p", { class: "ga-err" }, /admin_lookup_email|PGRST202|does not exist/i.test(error.message || "")
+        ? ["Run ", el("code", { text: "admin-access.sql" }), " in Supabase's SQL Editor first."] : "Couldn't check that email. Try again."));
+      return;
+    }
+    showFound(email, f);
+  };
+  function showFound(email, f) {
+    const status = el("p", { class: "hint" });
+    const send = async (label, fn) => {
+      status.className = "hint"; status.textContent = "Sending…";
+      const { error } = await fn();
+      if (error) {
+        status.className = "ga-err";
+        status.textContent = /rate|seconds|too many/i.test(error.message || "")
+          ? "An email just went to this address. Wait a minute, then try again."
+          : `Couldn't send: ${error.message || "unknown error"}`;
+        return;
+      }
+      dlg.dataset.changed = "1";
+      status.className = "ga-ok"; status.textContent = `Sent: ${label} to ${email}. Tell them to check spam if it isn't there in a few minutes.`;
+    };
+    let box, primary;
+    if (!f.exists) {
+      box = el("div", { class: "ga-found" }, el("b", { text: "No account yet" }), el("span", { class: "hint", text: "I'll create one and email a sign-in link. After they click it, they choose their own password." }));
+      primary = el("button", { type: "button", class: "btn primary", text: "Create account & email sign-in link" });
+      primary.onclick = () => send("a sign-in link", () => sb.auth.signInWithOtp({ email, options: { shouldCreateUser: true, emailRedirectTo: SITE, data: { must_change_password: true } } }));
+    } else {
+      const since = dateFmt.format(new Date(f.created_at));
+      box = el("div", { class: "ga-found" },
+        el("b", { text: f.confirmed ? "Has an account (confirmed)" : "Has an account, never confirmed" }),
+        el("span", { class: "hint", text: [f.screen_name, `signed up ${since}`, f.last_sign_in_at ? `last signed in ${ago(f.last_sign_in_at)}` : "never signed in", f.provider === "google" ? "uses Google" : ""].filter(Boolean).join(" · ") }));
+      if (!f.confirmed) {
+        primary = el("button", { type: "button", class: "btn primary", text: "Re-send confirmation email" });
+        primary.onclick = () => send("the confirmation email", () => sb.auth.resend({ type: "signup", email, options: { emailRedirectTo: SITE } }));
+      } else {
+        primary = el("button", { type: "button", class: "btn primary", text: "Email a password reset link" });
+        primary.onclick = () => send("a password reset link", () => sb.auth.resetPasswordForEmail(email, { redirectTo: SITE }));
+      }
+    }
+    const tempLink = el("button", { type: "button", class: "ga-link", text: "Email not arriving? Set a temporary password instead" });
+    tempLink.onclick = () => giveTemp(email);
+    out.replaceChildren(box, el("div", { class: "ga-actions" }, primary), status, tempLink);
+  }
+  async function giveTemp(email) {
+    const ok = confirm(`Set a temporary password for ${email}? ${"\n"}If they have an account, their current password stops working. You'll send it to them yourself.`);
+    if (!ok) return;
+    const { data: g, error } = await sb.rpc("admin_give_access", { target_email: email });
+    if (error) { out.append(el("p", { class: "ga-err", text: /admin_give_access|PGRST202/i.test(error.message || "") ? "Run admin-access.sql in Supabase's SQL Editor first." : `Couldn't set it: ${error.message}` })); return; }
+    dlg.dataset.changed = "1";
+    const msg = `Hi! Your Where I've Been account is ready.\n\nSign in at ${SITE}\nEmail: ${g.email}\nTemporary password: ${g.temp_password}\n\nYou'll be asked to choose your own password after you sign in.`;
+    const ta = el("textarea", { class: "ga-msg", "aria-label": "Message to send" }); ta.value = msg;
+    const subj = encodeURIComponent("Your Where I've Been account");
+    const copyBtn = el("button", { type: "button", class: "btn", text: "Copy" });
+    copyBtn.onclick = async () => { try { await navigator.clipboard.writeText(ta.value); copyBtn.textContent = "Copied"; } catch { ta.select(); } };
+    out.replaceChildren(
+      el("p", { class: "ga-ok", text: g.status === "created" ? "Account created and confirmed." : "Account confirmed and password set." }),
+      el("div", { class: "ga-pw", text: g.temp_password }),
+      el("p", { class: "hint", text: "Send this to them. They'll choose their own password after signing in." }),
+      ta,
+      el("div", { class: "ga-share" },
+        el("a", { class: "btn", href: `mailto:${encodeURIComponent(g.email)}?subject=${subj}&body=${encodeURIComponent(msg)}`, text: "Email" }),
+        el("a", { class: "btn", href: `sms:?&body=${encodeURIComponent(msg)}`, text: "Text" }),
+        copyBtn));
+  }
+  dlg.showModal();
+  (prefill ? checkBtn : input).focus();
+  if (prefill) form.requestSubmit();
+}
+$("giveBtn").onclick = () => openGive();
 
 start();
 </script>

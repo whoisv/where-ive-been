@@ -4,6 +4,7 @@ Releases of Where I've Been. Each release is one production deploy; the version 
 
 ## Pending release (on `preview`, not yet live)
 - v1.19: Share my map opens as a pop-up over the page (full screen on phones) instead of below the panel, with the preview on the left and size, look and Share/Download on the right. Close with ✕, Esc or a click outside.
+- v1.20: Admin "Give access" button (also opens from any "Not confirmed" tag in the traveler list). Type an email; it checks for an account, then sends the right email through the site's email service: a sign-in link that creates the account (new people), the confirmation email again (never confirmed), or a password reset link (confirmed). Backup: set a temporary password and send it yourself by email, text or copy. People set up this way choose their own password right after signing in. Requires admin-access.sql.
 
 ## v1.18 · Nov 15, 2026 (live)
 - Share my map. A "Share my map" button next to your country count makes an image of your map with visited countries in their continent colors, your screen name, home, "traveling since", country count, share of the world and continents, plus "Made with Where I've Been · whereihavebeen.com" at the bottom. Three sizes (Square for posts, Story with continent counts and flags, Wide for Facebook/X/link previews), light or dark. On phones it opens the share sheet; on computers it downloads a PNG. Never shows email, trips or notes.
