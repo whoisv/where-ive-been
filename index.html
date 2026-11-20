@@ -453,7 +453,7 @@ details.more .more-body { display: grid; gap: 18px; padding: 4px 12px 14px; }
 "use strict";
 
 /* Bump on every change so it's easy to see which version is live. */
-const APP_VERSION = "v1.21 · Nov 20, 2026 · preview 2";
+const APP_VERSION = "v1.21 · Nov 20, 2026 · preview 3";
 
 /* ---------- Reference data ---------- */
 const CONTINENTS = {
@@ -476,10 +476,9 @@ const STATE_REGIONS = {
   MW: ["Midwest", "IL IN MI OH WI IA KS MN MO NE ND SD"],
   NE: ["Northeast", "CT ME MA NH RI VT NJ NY PA"],
   SO: ["South", "DE FL GA MD NC SC VA WV AL KY MS TN AR LA OK TX"],
-  TR: ["Territories", "PR GU VI AS MP"],
   WE: ["West", "AZ CO ID MT NV NM UT WY AK CA HI OR WA"]
 };
-const REGION_AZ = ["MW", "NE", "SO", "TR", "WE"];
+const REGION_AZ = ["MW", "NE", "SO", "WE"];   // owner's choice: the 50 states only for now (territories may come later)
 const STATE_NAMES = {
   AL: "Alabama", AK: "Alaska", AZ: "Arizona", AR: "Arkansas", CA: "California", CO: "Colorado", CT: "Connecticut", DE: "Delaware",
   FL: "Florida", GA: "Georgia", HI: "Hawaii", ID: "Idaho", IL: "Illinois", IN: "Indiana", IA: "Iowa", KS: "Kansas", KY: "Kentucky",
@@ -487,8 +486,7 @@ const STATE_NAMES = {
   MO: "Missouri", MT: "Montana", NE: "Nebraska", NV: "Nevada", NH: "New Hampshire", NJ: "New Jersey", NM: "New Mexico",
   NY: "New York", NC: "North Carolina", ND: "North Dakota", OH: "Ohio", OK: "Oklahoma", OR: "Oregon", PA: "Pennsylvania",
   RI: "Rhode Island", SC: "South Carolina", SD: "South Dakota", TN: "Tennessee", TX: "Texas", UT: "Utah", VT: "Vermont",
-  VA: "Virginia", WA: "Washington", WV: "West Virginia", WI: "Wisconsin", WY: "Wyoming",
-  PR: "Puerto Rico", GU: "Guam", VI: "U.S. Virgin Islands", AS: "American Samoa", MP: "Northern Mariana Islands"
+  VA: "Virginia", WA: "Washington", WV: "West Virginia", WI: "Wisconsin", WY: "Wyoming"
 };
 for (const [k, [, list]] of Object.entries(STATE_REGIONS)) list.split(" ").forEach(a => contOf["US-" + a] = k);
 const isStateCode = c => /^US-[A-Z]{2}$/.test(c);
@@ -901,7 +899,7 @@ function openHelp() {
         P_("Where I've Been is a personal travel map. Mark the countries you've visited, keep notes on your trips, earn badges, and, if you like, compare your travels with other people in the traveler community.")),
       sec("How to use it",
         UL([
-          "Countries or States: switch maps with the Countries | States buttons at the top of the panel. Choose which one the app opens on in Profile.",
+          "Countries or States: switch maps with the Countries | States buttons at the top of the panel. States covers the 50 US states. Choose which one the app opens on in Profile.",
           "Mark a country: open Check off countries, open a continent and tap the country. Tap again to undo. On a computer you can also double-click a country on the map. States work the same way, grouped by region.",
           "Open a country's page: click it on the map, or click its name in the Visited tab. You'll see a photo, the flag and key facts.",
           "Year first visited: type the year on a country's page. It feeds your \"traveling since\" year, countries this year and the Big year badge.",
@@ -1505,7 +1503,7 @@ function zoomTo(code) {
 /* ---------- States map: geometry, drawing, switching ---------- */
 // Names in map data that differ from STATE_NAMES
 const STATE_NAME_ALIASES = { "district of columbia": "US-DC", "united states virgin islands": "US-VI", "commonwealth of the northern mariana islands": "US-MP" };
-const stateCodeFromMapName = name => STATE_NAME_ALIASES[String(name || "").toLowerCase()] || stateCodeByName(name);
+const stateCodeFromMapName = name => STATE_NAME_ALIASES[String(name || "").toLowerCase()] || stateCodeByName(name) || "US-ZZ";
 
 async function loadStateGeometry() {
   // 0. us-atlas: US state outlines already laid out for a US map (Alaska and Hawaii inset), 975 × 610.
@@ -1524,7 +1522,7 @@ async function loadStateGeometry() {
       const list = fc.features.map(f => {
         const code = stateCodeFromMapName(f.properties && f.properties.name);
         const d = path(f);
-        return code && d ? { code, name: STATE_NAMES[code.slice(3)] || "Washington, D.C.", d } : null;
+        return code && d ? { code, name: STATE_NAMES[code.slice(3)] || f.properties.name, d } : null;
       }).filter(Boolean);
       if (list.length > 40) return { W: 975, H: 610, list };
     }
