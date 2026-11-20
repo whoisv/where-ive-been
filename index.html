@@ -317,6 +317,14 @@ details.more .more-body { display: grid; gap: 18px; padding: 4px 12px 14px; }
 .help summary { cursor: pointer; padding: 10px 0; font-weight: 600; font-size: 14px; }
 .help details > p, .help details > ul { padding-bottom: 12px; }
 .help .contact { border: 1px solid var(--line); border-radius: 10px; padding: 12px; background: var(--bg); }
+/* Countries | States switcher */
+.viewsw { display: inline-grid; grid-template-columns: 1fr 1fr; gap: 2px; padding: 3px; border-radius: 10px; background: var(--bg); border: 1px solid var(--line); justify-self: start; }
+.viewsw button { border: 0; background: none; padding: 6px 16px; border-radius: 7px; font-weight: 600; font-size: 13.5px; color: var(--muted); cursor: pointer; }
+.viewsw button[aria-selected="true"] { background: var(--surface); color: var(--ink); box-shadow: 0 1px 3px rgba(0,0,0,.12); }
+/* State regions reuse the continent palette */
+.cont-MW { --cc: var(--c-AF); } .cont-NE { --cc: var(--c-EU); } .cont-SO { --cc: var(--c-AS); } .cont-TR { --cc: var(--c-OC); } .cont-WE { --cc: var(--c-NA); }
+.map-label { font-family: var(--font-body); font-size: 11px; fill: var(--muted); pointer-events: none; }
+.map-note { position: absolute; inset: 0; display: grid; place-items: center; color: var(--muted); padding: 24px; text-align: center; pointer-events: none; }
 .toast { position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); background: var(--ink); color: var(--bg); padding: 8px 14px; border-radius: 8px; font-size: 13px; opacity: 0; pointer-events: none; transition: opacity .2s; }
 .toast.show { opacity: 1; }
 
@@ -350,10 +358,15 @@ details.more .more-body { display: grid; gap: 18px; padding: 4px 12px 14px; }
     </div>
     <div class="tooltip" id="tip"></div>
     <div class="ver" id="appVersion"></div>
+    <div class="map-note" id="stateMsg" hidden>Loading the States map…</div>
   </div>
 
   <aside class="panel">
     <div class="summary">
+      <div class="viewsw" role="tablist" aria-label="Choose a map">
+        <button type="button" role="tab" id="vCountries" aria-selected="true">Countries</button>
+        <button type="button" role="tab" id="vStates" aria-selected="false">States</button>
+      </div>
       <div class="me-line" id="meLine" hidden></div>
       <div class="big"><strong id="count">0</strong><span id="countLabel">countries visited</span><button type="button" class="share-btn" id="shareBtn" hidden>Share my map</button></div>
       <div class="tiles" id="tiles"></div>
@@ -440,7 +453,7 @@ details.more .more-body { display: grid; gap: 18px; padding: 4px 12px 14px; }
 "use strict";
 
 /* Bump on every change so it's easy to see which version is live. */
-const APP_VERSION = "v1.20 · Nov 16, 2026";
+const APP_VERSION = "v1.21 · Nov 20, 2026 · preview";
 
 /* ---------- Reference data ---------- */
 const CONTINENTS = {
@@ -456,7 +469,41 @@ const CONTINENTS = {
 const CONT_AZ = ["AF", "AN", "AS", "EU", "NA", "OC", "SA"];
 const contOf = {};
 for (const [k, [, list]] of Object.entries(CONTINENTS)) list.split(" ").forEach(c => contOf[c] = k);
-const contName = code => (CONTINENTS[contOf[code]] || ["Other"])[0];
+const contName = code => (CONTINENTS[contOf[code]] || STATE_REGIONS[contOf[code]] || ["Other"])[0];
+
+/* ---------- States: the second map (US states + territories, grouped by Census region) ---------- */
+const STATE_REGIONS = {
+  MW: ["Midwest", "IL IN MI OH WI IA KS MN MO NE ND SD"],
+  NE: ["Northeast", "CT ME MA NH RI VT NJ NY PA"],
+  SO: ["South", "DE FL GA MD NC SC VA WV AL KY MS TN AR LA OK TX"],
+  TR: ["Territories", "PR GU VI AS MP"],
+  WE: ["West", "AZ CO ID MT NV NM UT WY AK CA HI OR WA"]
+};
+const REGION_AZ = ["MW", "NE", "SO", "TR", "WE"];
+const STATE_NAMES = {
+  AL: "Alabama", AK: "Alaska", AZ: "Arizona", AR: "Arkansas", CA: "California", CO: "Colorado", CT: "Connecticut", DE: "Delaware",
+  FL: "Florida", GA: "Georgia", HI: "Hawaii", ID: "Idaho", IL: "Illinois", IN: "Indiana", IA: "Iowa", KS: "Kansas", KY: "Kentucky",
+  LA: "Louisiana", ME: "Maine", MD: "Maryland", MA: "Massachusetts", MI: "Michigan", MN: "Minnesota", MS: "Mississippi",
+  MO: "Missouri", MT: "Montana", NE: "Nebraska", NV: "Nevada", NH: "New Hampshire", NJ: "New Jersey", NM: "New Mexico",
+  NY: "New York", NC: "North Carolina", ND: "North Dakota", OH: "Ohio", OK: "Oklahoma", OR: "Oregon", PA: "Pennsylvania",
+  RI: "Rhode Island", SC: "South Carolina", SD: "South Dakota", TN: "Tennessee", TX: "Texas", UT: "Utah", VT: "Vermont",
+  VA: "Virginia", WA: "Washington", WV: "West Virginia", WI: "Wisconsin", WY: "Wyoming",
+  PR: "Puerto Rico", GU: "Guam", VI: "U.S. Virgin Islands", AS: "American Samoa", MP: "Northern Mariana Islands"
+};
+for (const [k, [, list]] of Object.entries(STATE_REGIONS)) list.split(" ").forEach(a => contOf["US-" + a] = k);
+const isStateCode = c => /^US-[A-Z]{2}$/.test(c);
+const STATE_EXCLUDE = new Set(["US-DC"]);   // owner's choice: Washington, D.C. is shown but not counted
+const TERRITORY_POS = { PR: [-66.5, 18.2], VI: [-64.8, 18.3], GU: [144.8, 13.4], MP: [145.7, 15.2], AS: [-170.7, -14.3] };
+// Flag image key: states use flagcdn's "us-ca" style; territories have their own country-style flags.
+const flagKey = code => isStateCode(code) && /^(PR|GU|VI|AS|MP)$/.test(code.slice(3)) ? code.slice(3).toLowerCase() : code.toLowerCase();
+const flagSrc = (code, w) => `https://flagcdn.com/w${w}/${flagKey(code)}.png`;
+function stateCodeByName(raw) {
+  const t = String(raw || "").trim();
+  if (/^[A-Za-z]{2}$/.test(t) && STATE_NAMES[t.toUpperCase()]) return "US-" + t.toUpperCase();
+  const n = t.toLowerCase().replace(/\./g, "");
+  const hit = Object.entries(STATE_NAMES).find(([, name]) => name.toLowerCase().replace(/\./g, "") === n);
+  return hit ? "US-" + hit[0] : "";
+}
 
 /* ---------- Small helpers ---------- */
 const $ = id => document.getElementById(id);
@@ -490,6 +537,15 @@ function toast(msg) {
 /* ---------- State ---------- */
 let countries = [];          // [{code, name, d}] every shape on the map, territories included
 let listCountries = [];      // sovereign countries only: what you check off and count
+let stateList = [];          // US states and territories (the States map)
+let currentList = [];        // whichever list the Countries | States switcher shows
+let view = "countries";      // "countries" or "states"
+let viewChosen = false;      // true once the person picks a map this visit (then the Profile default doesn't override it)
+const groupKeys = () => view === "states" ? REGION_AZ : CONT_AZ;
+const groupName = k => (CONTINENTS[k] || STATE_REGIONS[k] || ["Other"])[0];
+const NOUN = () => view === "states"
+  ? { many: "states", one: "state", group: "regions", groupOne: "region", where: "the US", title: "States" }
+  : { many: "countries", one: "country", group: "continents", groupOne: "continent", where: "the world", title: "Countries" };
 const byCode = {};
 
 /* Territories light up with the country they belong to. */
@@ -562,7 +618,15 @@ function persist(code, immediate) {
   P.timers.set(code, setTimeout(() => { P.timers.delete(code); flush(code); }, immediate ? 0 : 700));
   setStatus("busy", "Saving…");
 }
+async function upsertState(code, r) {
+  const row = { user_id: session.user.id, state_code: code, visited: r.visited, trips: r.trips, notes: r.notes,
+    first_year: r.firstYear || null, updated_at: new Date().toISOString() };
+  const res = await sb.from("state_visits").upsert(row, { onConflict: "user_id,state_code" });
+  if (res.error && /state_visits|relation|schema cache/i.test(res.error.message || "")) P.noStates = true;
+  return res;
+}
 async function upsertVisit(code, r) {
+  if (isStateCode(code)) return upsertState(code, r);
   const row = { user_id: session.user.id, country_code: code, visited: r.visited,
     trips: r.trips, notes: r.notes, updated_at: new Date().toISOString() };
   if (!P.noYearColumn) row.first_year = r.firstYear || null;
@@ -582,7 +646,7 @@ async function flush(code, retried) {
   let retry = false;
   try {
     const res = (!r || isEmptyRec(r))
-      ? await sb.from("visits").delete().eq("country_code", code)
+      ? await (isStateCode(code) ? sb.from("state_visits").delete().eq("state_code", code) : sb.from("visits").delete().eq("country_code", code))
       : await upsertVisit(code, r);
     if (res.error) throw res.error;
     if (!P.timers.size && P.inflight.size === 1 && !P.dirty.size) { setStatus("ok", signedInText()); refreshRank(1500); }
@@ -618,6 +682,9 @@ async function loadRecords() {
   if (error) { setStatus("warn", "Couldn't load your countries. Refresh to try again."); return; }
   records = {};
   (data || []).forEach(row => { records[row.country_code] = sanitize(row); });
+  const st = await sb.from("state_visits").select("state_code,visited,trips,notes,first_year");
+  if (st.error) P.noStates = true;
+  else { P.noStates = false; (st.data || []).forEach(row => { records[row.state_code] = sanitize(row); }); }
   P.mode = "cloud";
   migrateTerritories();
   setStatus("ok", signedInText());
@@ -625,6 +692,7 @@ async function loadRecords() {
   if (authMode !== "reset") showView("list");
   renderAll();
   await loadProfile();
+  if (!viewChosen) { const pref = defaultViewPref(); if (pref !== view) switchView(pref); }
   ensureHomeVisited();
   renderSummary();
   if (tab === "board") { loadBoard(true); renderList(); }
@@ -780,14 +848,30 @@ function renderMeLine(sinceYear) {
 }
 // Your home country counts as visited.
 function ensureHomeVisited() {
-  const raw = homeInfo().code;
-  if (!raw || !canEdit()) return;
-  const code = eff(raw);
-  if (!byCode[code] || isVisited(code)) return;
-  records[code] = { ...rec(code), visited: true };
-  persist(code, true);
+  const h = homeInfo();
+  if (!h.code || !canEdit()) return;
+  const marked = [];
+  const code = eff(h.code);
+  if (byCode[code] && !isVisited(code)) {
+    records[code] = { ...rec(code), visited: true };
+    persist(code, true);
+    marked.push(`${byCode[code].name} (your home country)`);
+  }
+  // A US home state counts as visited on the States map too.
+  const sc = h.code === "US" && !P.noStates ? stateCodeByName(h.state) : "";
+  if (sc && !STATE_EXCLUDE.has(sc) && !isVisited(sc)) {
+    records[sc] = { ...rec(sc), visited: true };
+    persist(sc, true);
+    marked.push(`${STATE_NAMES[sc.slice(3)]} (your home state)`);
+  }
+  if (!marked.length) return;
   renderSummary(); paintMap(); renderList();
-  toast(`${byCode[code].name} marked as visited (your home country)`);
+  toast(`${marked.join(" and ")} marked as visited`);
+}
+function defaultViewPref() {
+  const meta = (session && session.user.user_metadata) || {};
+  const v = (myProfile && myProfile.default_view) || meta.default_view;
+  return v === "states" ? "states" : "countries";
 }
 
 
@@ -817,7 +901,8 @@ function openHelp() {
         P_("Where I've Been is a personal travel map. Mark the countries you've visited, keep notes on your trips, earn badges, and, if you like, compare your travels with other people in the traveler community.")),
       sec("How to use it",
         UL([
-          "Mark a country: open Check off countries, open a continent and tap the country. Tap again to undo. On a computer you can also double-click a country on the map.",
+          "Countries or States: switch maps with the Countries | States buttons at the top of the panel. Choose which one the app opens on in Profile.",
+          "Mark a country: open Check off countries, open a continent and tap the country. Tap again to undo. On a computer you can also double-click a country on the map. States work the same way, grouped by region.",
           "Open a country's page: click it on the map, or click its name in the Visited tab. You'll see a photo, the flag and key facts.",
           "Year first visited: type the year on a country's page. It feeds your \"traveling since\" year, countries this year and the Big year badge.",
           "Trips and notes (optional): on a country's page, open Add trip details and notes to log each visit with dates and what you did.",
@@ -991,6 +1076,9 @@ $("googleBtn").onclick = async () => {
 $("signOutBtn").onclick = async () => { await sb.auth.signOut(); };
 
 function openProfile() {
+  const dvSel = el("select", { id: "profileView", class: "select" },
+    el("option", { value: "countries" }, "Countries"), el("option", { value: "states" }, "States"));
+  dvSel.value = defaultViewPref();
   if (!session) return;
   selected = null; paintMap();
   showView("detail");
@@ -1013,6 +1101,7 @@ function openProfile() {
     el("label", { class: "field", for: "profileCountry" }, "Home country", hc),
     el("label", { class: "field", for: "profileState" }, "State / province", hs),
     hcont,
+    el("label", { class: "field", for: "profileView" }, "Open the app on", dvSel),
     pubRow,
     save, msg);
   bindHome(hc, hs, hcont, typeof meta.home_country === "string" ? meta.home_country : "", typeof meta.home_state === "string" ? meta.home_state : "");
@@ -1041,7 +1130,9 @@ function openProfile() {
         return;
       }
       // 2. Account details (screen name shown in the status line)
-      const acct = await withTimeout(sb.auth.updateUser({ data: { screen_name: name, ...home, is_public: pub.checked } }), 15000);
+      const acct = await withTimeout(sb.auth.updateUser({ data: { screen_name: name, ...home, is_public: pub.checked, default_view: dvSel.value } }), 15000);
+      const dvRes = await sb.from("profiles").update({ default_view: dvSel.value }).eq("user_id", session.user.id);
+      if (!dvRes.error && myProfile) myProfile.default_view = dvSel.value;
       if (acct.data && acct.data.user && session) session = { ...session, user: acct.data.user };
       setStatus("ok", signedInText());
       const homeTxt = homeText((session && session.user.user_metadata) || {});
@@ -1338,6 +1429,7 @@ function addSmall(geo) {
 
 /* ---------- Map rendering ---------- */
 let svg, gRoot, paths, zoom, mapW, mapH, mapGeo = null;
+const MAPS = {};   // { countries: {svg, gRoot, paths, zoom, mapW, mapH}, states: {...} }
 
 function drawMap(geo) {
   mapGeo = geo;
@@ -1350,6 +1442,7 @@ function drawMap(geo) {
   countries = geo.list.filter(c => !outside(c) && !seen.has(c.code) && seen.add(c.code)).sort((a, b) => a.name.localeCompare(b.name));
   countries.forEach(c => byCode[c.code] = c);
   listCountries = countries.filter(c => eff(c.code) === c.code);
+  if (view === "countries") currentList = listCountries;
 
   svg = d3.select("#map").append("svg").attr("viewBox", `0 0 ${mapW} ${mapH}`).attr("preserveAspectRatio", "xMidYMid meet");
   gRoot = svg.append("g");
@@ -1390,6 +1483,7 @@ function drawMap(geo) {
   $("zout").onclick = () => svg.transition().duration(dur).call(zoom.scaleBy, 1 / 1.6);
   $("zreset").onclick = () => svg.transition().duration(dur * 2).call(zoom.transform, d3.zoomIdentity);
   $("mapMsg").remove();
+  MAPS.countries = { svg, gRoot, paths, zoom, mapW, mapH };
 }
 function paintMap() {
   if (!paths) return;
@@ -1407,6 +1501,159 @@ function zoomTo(code) {
 }
 
 
+
+/* ---------- States map: geometry, drawing, switching ---------- */
+async function loadStateGeometry() {
+  // 1. amCharts US outlines (longitude/latitude), drawn with d3's Albers USA projection (Alaska and Hawaii inset).
+  try {
+    await firstOf([
+      "https://cdn.jsdelivr.net/npm/@amcharts/amcharts4-geodata@4.1.28/dist/script/usaLow.js",
+      "https://cdn.jsdelivr.net/npm/@amcharts/amcharts4-geodata@4/dist/script/usaLow.js"
+    ]);
+    const g = window.am4geodata_usaLow;
+    if (g && Array.isArray(g.features) && g.features.length > 40) {
+      const W = 960, H = 560;
+      const feats = g.features.filter(f => f.geometry).map(f => ({ ...f, geometry: fixWinding(f.geometry) }));
+      const proj = d3.geoAlbersUsa().fitExtent([[12, 12], [W - 12, H - 12]], { type: "FeatureCollection", features: feats });
+      const path = d3.geoPath(proj);
+      const list = feats.map(f => {
+        let code = String(f.id || (f.properties && f.properties.id) || "").toUpperCase();
+        if (/^[A-Z]{2}$/.test(code)) code = "US-" + code;
+        const d = path(f);
+        return d && isStateCode(code) ? { code, name: STATE_NAMES[code.slice(3)] || (f.properties && f.properties.name) || code, d } : null;
+      }).filter(Boolean);
+      if (list.length > 40) return { W, H, list };
+    }
+  } catch {}
+  // 2. jsVectorMap US maps (already projected), if amCharts isn't available.
+  for (const name of ["us-aea-en", "us-lcc-en", "us-mill-en", "us-merc-en"]) {
+    try {
+      let captured = null;
+      window.jsVectorMap = { addMap: (n, d) => { captured = d; } };
+      await firstOf([`https://cdn.jsdelivr.net/npm/jsvectormap@1.5.3/dist/maps/${name}.js`, `https://cdn.jsdelivr.net/npm/jsvectormap@1.6.0/dist/maps/${name}.js`]);
+      if (!captured || !captured.paths) continue;
+      const list = Object.entries(captured.paths).map(([k, p]) => {
+        let code = k.toUpperCase(); if (/^[A-Z]{2}$/.test(code)) code = "US-" + code;
+        return p && p.path && isStateCode(code) ? { code, name: STATE_NAMES[code.slice(3)] || p.name || code, d: p.path } : null;
+      }).filter(Boolean);
+      if (list.length > 40) return { W: captured.width || 900, H: captured.height || 560, list };
+    } catch {}
+  }
+  return null;
+}
+
+// Territories (and any state the outlines lack) become labelled dots in a strip under the map.
+function addStateDots(geo) {
+  const have = new Set(geo.list.map(c => c.code));
+  const missing = Object.keys(STATE_NAMES).map(a => "US-" + a).filter(c => !have.has(c));
+  if (!missing.length) return;
+  const top = geo.H + 18, r = 8, step = Math.min(120, (geo.W - 40) / missing.length);
+  const x0 = geo.W / 2 - step * (missing.length - 1) / 2;
+  geo.labels = [];
+  missing.forEach((code, i) => {
+    const x = x0 + i * step, y = top;
+    geo.list.push({ code, name: STATE_NAMES[code.slice(3)], dot: true,
+      d: `M${(x - r).toFixed(1)},${y}a${r},${r} 0 1,0 ${2 * r},0a${r},${r} 0 1,0 ${-2 * r},0Z` });
+    geo.labels.push({ x, y: y + r + 13, text: STATE_NAMES[code.slice(3)] });
+  });
+  geo.H = top + r + 24;
+}
+
+function drawStateMap(geo) {
+  const W = geo.W, H = geo.H, seen = new Set();
+  const inert = geo.list.filter(c => STATE_EXCLUDE.has(c.code) || !contOf[c.code]);
+  stateList = geo.list.filter(c => !STATE_EXCLUDE.has(c.code) && contOf[c.code] && !seen.has(c.code) && seen.add(c.code))
+    .sort((a, b) => a.name.localeCompare(b.name));
+  stateList.forEach(c => byCode[c.code] = c);
+  const s = d3.select("#map").append("svg").attr("viewBox", `0 0 ${W} ${H}`).attr("preserveAspectRatio", "xMidYMid meet")
+    .style("display", view === "states" ? null : "none");
+  const g = s.append("g");
+  g.append("g").selectAll("path").data(inert).join("path").attr("class", "inert").attr("d", d => d.d);
+  g.append("g").selectAll("path").data(stateList.filter(c => !c.dot), d => d.code).join("path")
+    .attr("class", d => "country cont-" + contOf[d.code]).attr("d", d => d.d);
+  g.append("g").selectAll("path").data(stateList.filter(c => c.dot), d => d.code).join("path")
+    .attr("class", d => "country dot cont-" + contOf[d.code]).attr("d", d => d.d);
+  g.append("g").selectAll("text").data(geo.labels || []).join("text").attr("class", "map-label")
+    .attr("x", d => d.x).attr("y", d => d.y).attr("text-anchor", "middle").text(d => d.text);
+  const tip = $("tip"), wrap = document.querySelector(".map-wrap");
+  const p = g.selectAll("path.country")
+    .on("mousemove", (e, d) => {
+      const r = rec(d.code), box = wrap.getBoundingClientRect();
+      tip.replaceChildren(d.name, el("small", { text: r.visited ? "Visited" : "Not visited yet" }));
+      tip.style.left = (e.clientX - box.left) + "px"; tip.style.top = (e.clientY - box.top) + "px";
+      tip.classList.add("show");
+    })
+    .on("mouseleave", () => tip.classList.remove("show"))
+    .on("click", (e, d) => { tip.classList.remove("show"); openDetail(d.code, false); })
+    .on("dblclick", (e, d) => { e.preventDefault(); if (canEdit()) setVisited(d.code, !isVisited(d.code)); });
+  const z = d3.zoom().scaleExtent([1, 16]).translateExtent([[0, 0], [W, H]]).on("zoom", e => g.attr("transform", e.transform));
+  s.call(z).on("dblclick.zoom", null);
+  MAPS.states = { svg: s, gRoot: g, paths: p, zoom: z, mapW: W, mapH: H };
+}
+
+// If the outlines can't load, the checklist still works from the names alone.
+function stateListFromNames() {
+  stateList = Object.entries(STATE_NAMES).map(([a, name]) => ({ code: "US-" + a, name })).sort((a, b) => a.name.localeCompare(b.name));
+  stateList.forEach(c => byCode[c.code] = byCode[c.code] || c);
+}
+
+function switchView(v) {
+  view = v === "states" ? "states" : "countries";
+  currentList = view === "states" ? stateList : listCountries;
+  if (MAPS.countries) MAPS.countries.svg.style("display", view === "countries" ? null : "none");
+  if (MAPS.states) MAPS.states.svg.style("display", view === "states" ? null : "none");
+  const m = MAPS[view];
+  if (m) ({ svg, gRoot, paths, zoom, mapW, mapH } = m);
+  const msg = $("stateMsg");
+  msg.hidden = !(view === "states" && !MAPS.states);
+  $("vCountries").setAttribute("aria-selected", String(view === "countries"));
+  $("vStates").setAttribute("aria-selected", String(view === "states"));
+  const N = NOUN();
+  $("tabAll").textContent = `Check off ${N.many}`;
+  $("search").placeholder = `Search ${N.many}`;
+  $("search").setAttribute("aria-label", `Search ${N.many}`);
+  const sub = document.querySelector(".map-title p");
+  if (sub) sub.textContent = `Double-click a ${N.one} to mark it visited · click to add trips`;
+  selected = null;
+  if (!$("detailView").hidden) showView(session ? "list" : "auth");
+  $("tip").classList.remove("show");
+  renderAll();
+}
+$("vCountries").addEventListener("click", () => { viewChosen = true; if (view !== "countries") switchView("countries"); });
+$("vStates").addEventListener("click", () => { viewChosen = true; if (view !== "states") switchView("states"); });
+
+/* A simple page for a state or territory: flag, name, region and a short description. */
+const STATE_WIKI = { "US-GA": "Georgia (U.S. state)", "US-WA": "Washington (state)", "US-NY": "New York (state)", "US-VI": "United States Virgin Islands" };
+let statePageCache = { code: null, node: null };
+function statePage(code) {
+  if (statePageCache.code === code && statePageCache.node) return statePageCache.node;
+  const c = byCode[code];
+  const k = contOf[code] || "XX";
+  const flag = el("img", { class: "flag", alt: `Flag of ${c.name}`, src: flagSrc(code, 160) });
+  flag.addEventListener("error", () => flag.remove());
+  const photo = el("img", { class: "hero-photo", alt: "" });
+  photo.addEventListener("load", () => photo.classList.add("ready"));
+  photo.addEventListener("error", () => photo.remove());
+  const credit = el("span", { class: "hero-credit" });
+  const hero = el("div", { class: "hero cont-" + k }, photo,
+    el("div", { class: "hero-title" }, flag, el("h2", { text: c.name }),
+      el("span", { class: "sub", text: k === "TR" ? "U.S. territory" : `${groupName(k)} · United States` })), credit);
+  const about = el("p", { class: "about" });
+  const src = el("p", { class: "hint src" });
+  const node = el("div", { class: "country-page" }, hero, about, src);
+  statePageCache = { code, node };
+  wikiSummary(STATE_WIKI[code] || c.name).then(C => {
+    if (C && C.extract && C.type !== "disambiguation") {
+      const sentences = C.extract.match(/[^.!?]+[.!?]+(\s|$)/g) || [C.extract];
+      about.replaceChildren(sentences.slice(0, 3).join("").trim() + " ",
+        C.url ? el("a", { href: C.url, target: "_blank", rel: "noopener", text: "Read more on Wikipedia" }) : "");
+      if (looksLikePhoto(C.thumb)) { photo.src = bigThumb(C.thumb); credit.textContent = `${C.title} · Wikipedia`; }
+      src.textContent = "Description: Wikipedia.";
+    }
+  }).catch(() => {});
+  return node;
+}
+
 /* ---------- Stat tiles ---------- */
 let rankInfo = null;   // {travelers, my_count, rank, average, top} from the database, when available
 function tripDays(t) {
@@ -1416,7 +1663,7 @@ function tripDays(t) {
 }
 function renderTiles(visited) {
   const box = $("tiles"); if (!box) return;
-  const contsTotal = new Set(listCountries.map(c => contOf[c.code]).filter(Boolean)).size;
+  const contsTotal = new Set(currentList.map(c => contOf[c.code]).filter(Boolean)).size;
   const contsVisited = new Set(visited.map(c => contOf[c.code]).filter(Boolean)).size;
   let days = 0;
   visited.forEach(c => rec(c.code).trips.forEach(t => { days += tripDays(t); }));
@@ -1424,14 +1671,14 @@ function renderTiles(visited) {
   const thisYear = visited.filter(c => { const r = rec(c.code); return String(r.firstYear) === yr || r.trips.some(t => (t.from || t.to).startsWith(yr)); }).length;
   const tile = (big, small, cls, title) => el("div", { class: "tile" + (cls ? " " + cls : ""), title }, el("b", { text: String(big) }), el("span", { text: small }));
   const out = [];
-  if (rankInfo && rankInfo.travelers) {
+  if (view === "countries" && rankInfo && rankInfo.travelers) {
     out.push(rankInfo.rank && visited.length
       ? tile("#" + rankInfo.rank, `of ${rankInfo.travelers} traveler${rankInfo.travelers === 1 ? "" : "s"}` +
           (rankInfo.percentile != null && rankInfo.travelers > 1 ? ` · ahead of ${rankInfo.percentile}%` : ""), "rank",
           `Average traveler: ${rankInfo.average} countries. Most traveled: ${rankInfo.top}.`)
       : tile("—", `${rankInfo.travelers} traveler${rankInfo.travelers === 1 ? "" : "s"} so far`, "rank"));
   }
-  out.push(tile(`${contsVisited}/${contsTotal}`, "continents"));
+  out.push(tile(`${contsVisited}/${contsTotal}`, NOUN().group));
   // Date-based tiles appear only once someone has entered years or dated trips.
   const hasDates = visited.some(c => { const r = rec(c.code); return r.firstYear || r.trips.some(t => isDate(t.from) || isDate(t.to)); });
   if (hasDates) out.push(tile(thisYear, `countries in ${yr}`));
@@ -1553,48 +1800,57 @@ $("badgeRow").addEventListener("click", openBadges);
 
 /* ---------- Panel rendering ---------- */
 function renderSummary() {
-  const visited = listCountries.filter(c => isVisited(c.code));
+  const visited = currentList.filter(c => isVisited(c.code));
   $("count").textContent = visited.length;
   const trips = visited.reduce((n, c) => n + rec(c.code).trips.length, 0);
   const years = visited.map(c => firstDate(rec(c.code))).filter(Boolean).sort();
-  const total = listCountries.length;
+  const total = currentList.length;
   const pct = total ? Math.round(100 * visited.length / total) : 0;
-  $("countLabel").replaceChildren(`of ${total} countries`, el("br"),
-    el("em", { text: `${pct}% of the world` }));
+  $("countLabel").replaceChildren(`of ${total} ${NOUN().many}`, el("br"),
+    el("em", { text: `${pct}% of ${NOUN().where}` }));
   renderMeLine(years.length ? years[0].slice(0, 4) : "");
   renderTiles(visited);
   renderBadgeRow();
+  $("badgeRow").hidden = view === "states";            // state badges come in a later release
+  $("shareBtn").hidden = !session || view === "states"; // Share my map shows countries
 
   const ul = $("conts"); ul.replaceChildren();
-  for (const k of CONT_AZ) {
-    const all = listCountries.filter(c => contOf[c.code] === k);
+  for (const k of groupKeys()) {
+    const all = currentList.filter(c => contOf[c.code] === k);
     if (!all.length) continue;
     const v = all.filter(c => isVisited(c.code)).length;
     ul.append(el("li", { class: "cont-" + k },
-      el("span", { class: "cn" }, el("i", { class: "swc" }), CONTINENTS[k][0]),
+      el("span", { class: "cn" }, el("i", { class: "swc" }), groupName(k)),
       el("span", { class: "bar", role: "img", "aria-label": `${v} of ${all.length}` }, el("i", { style: `width:${(100 * v / all.length).toFixed(1)}%` })),
       el("span", { class: "n" }, `${v}/${all.length}`, el("b", { text: `${Math.round(100 * v / all.length)}%` }))));
   }
 }
 
 function renderList() {
+  if (tab === "board" && view === "states") {
+    $("list").replaceChildren(el("li", { class: "board-note", style: "display:block", text: "State leaderboards are coming soon. Switch to Countries to see the country leaderboards." }));
+    return;
+  }
   if (tab === "board") { renderBoard(); return; }
   const q = $("search").value.trim().toLowerCase();
-  let items = listCountries.filter(c => !q || c.name.toLowerCase().includes(q) || c.code.toLowerCase() === q);
+  let items = currentList.filter(c => !q || c.name.toLowerCase().includes(q) || c.code.toLowerCase() === q || (isStateCode(c.code) && c.code.slice(3).toLowerCase() === q));
   if (tab === "visited") items = items.filter(c => isVisited(c.code));
   const ul = $("list");
   const keepScroll = ul.scrollTop;
   ul.replaceChildren();
-  $("tabVisited").textContent = `Visited (${listCountries.filter(c => isVisited(c.code)).length})`;
+  $("tabVisited").textContent = `Visited (${currentList.filter(c => isVisited(c.code)).length})`;
 
   if (!items.length) {
     ul.append(el("li", { class: "empty", style: "display:block" },
       tab === "visited" && !q
-        ? "No countries yet. Click one on the map, or open Check off countries and tick the places you've been."
-        : "No country matches that search."));
+        ? `No ${NOUN().many} yet. Click one on the map, or open Check off ${NOUN().many} and tick the places you've been.`
+        : `No ${NOUN().one} matches that search.`));
     return;
   }
-  if (tab === "all") { renderChips(ul, items, q); ul.scrollTop = keepScroll; return; }
+  if (tab === "all") {
+    if (view === "states" && P.noStates && session) ul.append(el("li", { class: "board-note", style: "display:block", text: "States can't be saved yet: the site owner needs to run add-states.sql in Supabase." }));
+    renderChips(ul, items, q); ul.scrollTop = keepScroll; return;
+  }
   for (const c of items) {
     const r = rec(c.code);
     const fd = firstDate(r);
@@ -1613,7 +1869,7 @@ const openConts = new Set();
 const CONT_ORDER = CONT_AZ;
 function chip(c) {
   const on = isVisited(c.code);
-  const flag = el("img", { class: "cf", alt: "", loading: "lazy", src: `https://flagcdn.com/w40/${c.code.toLowerCase()}.png` });
+  const flag = el("img", { class: "cf", alt: "", loading: "lazy", src: flagSrc(c.code, 40) });
   flag.addEventListener("error", () => flag.replaceWith(el("span", { class: "cf fe", "aria-hidden": "true", text: flagEmoji(c.code) })));
   return el("button", { type: "button", class: "chip cont-" + (contOf[c.code] || "XX") + (on ? " on" : ""),
     "aria-pressed": String(on), disabled: !canEdit(), title: on ? `${c.name}: visited (tap to undo)` : `Mark ${c.name} as visited`,
@@ -1623,15 +1879,15 @@ function chip(c) {
 function renderChips(ul, items, q) {
   ul.append(el("li", { class: "chip-hint", style: "display:block", text: q
     ? "Tap a country to mark it visited."
-    : "Open a continent and tap the countries you've visited. Tap again to undo." }));
-  const groups = CONT_ORDER.concat(["XX"]).map(k => ({ k, list: items.filter(c => (contOf[c.code] || "XX") === k) })).filter(g => g.list.length);
+    : `Open a ${NOUN().groupOne} and tap the ${NOUN().many} you've visited. Tap again to undo.` }));
+  const groups = groupKeys().concat(["XX"]).map(k => ({ k, list: items.filter(c => (contOf[c.code] || "XX") === k) })).filter(g => g.list.length);
   for (const g of groups) {
-    const all = listCountries.filter(c => (contOf[c.code] || "XX") === g.k);
+    const all = currentList.filter(c => (contOf[c.code] || "XX") === g.k);
     const v = all.filter(c => isVisited(c.code)).length;
     const d = el("details", { class: "cgroup cont-" + g.k },
       el("summary", {},
         el("i", { class: "swc" }),
-        el("span", { class: "cn", text: g.k === "XX" ? "Other" : CONTINENTS[g.k][0] }),
+        el("span", { class: "cn", text: g.k === "XX" ? "Other" : groupName(g.k) }),
         el("span", { class: "bar" }, el("i", { style: `width:${all.length ? (100 * v / all.length).toFixed(1) : 0}%` })),
         el("span", { class: "n", text: `${v}/${all.length}` })),
       el("div", { class: "chips" }, ...g.list.map(chip)));
@@ -1842,7 +2098,7 @@ function renderDetail() {
 
   box.replaceChildren(
     el("button", { type: "button", class: "back", onclick: closeDetail }, "← All countries"),
-    countryPage(code),
+    (isStateCode(code) ? statePage(code) : countryPage(code)),
     el("button", { type: "button", class: "visit-btn" + (r.visited ? " on" : ""), disabled: ro, "aria-pressed": String(r.visited),
       onclick: () => setVisited(code, !r.visited) }, r.visited ? "✓ Visited" : "Mark as visited"),
     el("section", { class: "sec" },
@@ -2150,6 +2406,15 @@ const norm = s => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().repla
   .replace(/[^a-z]+/g, " ").replace(/\b(the|of|and|republic|rep|islands?|federation|kingdom|state|states|democratic|people s|plurinational)\b/g, " ")
   .replace(/\s+/g, " ").trim();
 
+function matchState(raw) {
+  const t = String(raw || "").trim();
+  const alias = { "usvi": "VI", "virgin islands": "VI", "us virgin islands": "VI", "samoa": "AS", "mariana islands": "MP", "cnmi": "MP" }[t.toLowerCase()];
+  const code = alias ? "US-" + alias : stateCodeByName(t);
+  if (code && stateList.some(c => c.code === code)) return code;
+  const n = t.toLowerCase();
+  const starts = stateList.filter(c => c.name.toLowerCase().startsWith(n));
+  return n.length >= 3 && starts.length === 1 ? starts[0].code : null;
+}
 function matchCountry(raw) {
   const n = norm(raw);
   if (!n) return null;
@@ -2177,7 +2442,10 @@ function openImport() {
     const parts = ta.value.split(/[\n,;•\t]+/).map(s => s.replace(/^\s*[\d]+[.)]\s*|^\s*[-*]\s*/, "").trim()).filter(Boolean);
     if (!parts.length) { toast("Paste some country names first"); return; }
     const found = new Set(), missed = [];
-    for (const p of parts) { const code = matchCountry(p); if (code) found.add(eff(code)); else missed.push(p); }
+    for (const p of parts) {
+      const code = view === "states" ? matchState(p) : matchCountry(p);
+      if (code) found.add(view === "states" ? code : eff(code)); else missed.push(p);
+    }
     const fresh = [...found].filter(c => !isVisited(c));
     go.disabled = true; go.textContent = `Saving ${fresh.length}…`;
     for (const code of fresh) records[code] = { ...rec(code), visited: true };
@@ -2206,8 +2474,8 @@ $("importBtn").addEventListener("click", openImport);
 
 /* ---------- Copy list ---------- */
 $("copyBtn").addEventListener("click", async () => {
-  const v = listCountries.filter(c => isVisited(c.code));
-  if (!v.length) { toast("Mark a country first"); return; }
+  const v = currentList.filter(c => isVisited(c.code));
+  if (!v.length) { toast(`Mark a ${NOUN().one} first`); return; }
   const lines = v.map(c => {
     const r = rec(c.code);
     const trips = r.trips.filter(t => t.from || t.to).map(t => [fmtDate(t.from), fmtDate(t.to)].filter(Boolean).join(" – ")).join("; ");
@@ -2215,7 +2483,7 @@ $("copyBtn").addEventListener("click", async () => {
     const extra = [yr, trips].filter(Boolean).join("; ");
     return `${c.name}${extra ? " (" + extra + ")" : ""}`;
   });
-  const text = `Countries I've visited: ${v.length}\n\n` + lines.join("\n");
+  const text = `${NOUN().title} I've visited: ${v.length}\n\n` + lines.join("\n");
   try { await navigator.clipboard.writeText(text); toast("List copied"); }
   catch { toast("Couldn't copy here. Your browser blocked it."); }
 });
@@ -2244,7 +2512,13 @@ document.addEventListener("keydown", e => { if (e.key === "Escape" && selected) 
   if (!geo) { $("mapMsg").textContent = "The world map couldn't load. Check your connection and refresh the page."; return; }
   addSmall(geo);
   drawMap(geo);
+  stateListFromNames();          // the checklist works even before (or without) the States outlines
   renderAll();
+  loadStateGeometry().then(sg => {
+    if (sg) { addStateDots(sg); drawStateMap(sg); }
+    else $("stateMsg").textContent = "The States map couldn't load. You can still check off states in the list.";
+    if (view === "states") switchView("states"); else renderAll();
+  }).catch(() => {});
   initAuth().then(() => { if (location.hash === "#help") openHelp(); });
 })();
 })();
