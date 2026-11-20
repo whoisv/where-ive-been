@@ -453,7 +453,7 @@ details.more .more-body { display: grid; gap: 18px; padding: 4px 12px 14px; }
 "use strict";
 
 /* Bump on every change so it's easy to see which version is live. */
-const APP_VERSION = "v1.21 · Nov 20, 2026 · preview";
+const APP_VERSION = "v1.21 · Nov 20, 2026 · preview 2";
 
 /* ---------- Reference data ---------- */
 const CONTINENTS = {
@@ -1503,7 +1503,32 @@ function zoomTo(code) {
 
 
 /* ---------- States map: geometry, drawing, switching ---------- */
+// Names in map data that differ from STATE_NAMES
+const STATE_NAME_ALIASES = { "district of columbia": "US-DC", "united states virgin islands": "US-VI", "commonwealth of the northern mariana islands": "US-MP" };
+const stateCodeFromMapName = name => STATE_NAME_ALIASES[String(name || "").toLowerCase()] || stateCodeByName(name);
+
 async function loadStateGeometry() {
+  // 0. us-atlas: US state outlines already laid out for a US map (Alaska and Hawaii inset), 975 × 610.
+  try {
+    if (!window.topojson) await firstOf([
+      "https://cdn.jsdelivr.net/npm/topojson-client@3.1.0/dist/topojson-client.min.js",
+      "https://cdnjs.cloudflare.com/ajax/libs/topojson-client/3.1.0/topojson-client.min.js"
+    ]);
+    let topo = null;
+    for (const url of ["https://cdn.jsdelivr.net/npm/us-atlas@3.0.1/states-albers-10m.json", "https://cdn.jsdelivr.net/npm/us-atlas@3/states-albers-10m.json"]) {
+      try { const r = await fetch(url); if (r.ok) { topo = await r.json(); break; } } catch {}
+    }
+    if (window.topojson && topo && topo.objects && topo.objects.states) {
+      const fc = window.topojson.feature(topo, topo.objects.states);
+      const path = d3.geoPath();   // coordinates are already projected
+      const list = fc.features.map(f => {
+        const code = stateCodeFromMapName(f.properties && f.properties.name);
+        const d = path(f);
+        return code && d ? { code, name: STATE_NAMES[code.slice(3)] || "Washington, D.C.", d } : null;
+      }).filter(Boolean);
+      if (list.length > 40) return { W: 975, H: 610, list };
+    }
+  } catch {}
   // 1. amCharts US outlines (longitude/latitude), drawn with d3's Albers USA projection (Alaska and Hawaii inset).
   try {
     await firstOf([
