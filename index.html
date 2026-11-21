@@ -474,7 +474,7 @@ details.more .more-body { display: grid; gap: 18px; padding: 4px 12px 14px; }
 "use strict";
 
 /* Bump on every change so it's easy to see which version is live. */
-const APP_VERSION = "v1.22 · Nov 20, 2026 · preview 4";
+const APP_VERSION = "v1.22 · Nov 20, 2026 · preview 5";
 
 /* ---------- Reference data ---------- */
 const CONTINENTS = {
@@ -1876,21 +1876,102 @@ function parkPage(code) {
   const hero = el("div", { class: "hero cont-" + k }, photo,
     el("div", { class: "hero-title" }, el("span", { class: "flag-emoji", "aria-hidden": "true", text: "🏞️" }),
       el("h2", { text: parkFullName(code) }), el("span", { class: "sub", text: `${info.states} · ${groupName(k)}` })), credit);
+  const facts = el("dl", { class: "facts" });
+  const fact = (label, value, wide) => {
+    const dd = el("dd", {}, value);
+    facts.append(el("div", { class: wide ? "wide" : "" }, el("dt", { text: label }), dd));
+    return dd;
+  };
+  const abbrs = info.states.split(/\s*,\s*/);
+  const fullStates = abbrs.map(a => STATE_NAMES[a] || ({ AS: "American Samoa", VI: "U.S. Virgin Islands" })[a] || a);
+  fact(abbrs.length > 1 ? "States" : (STATE_NAMES[abbrs[0]] ? "State" : "Territory"), fullStates.join(", "), abbrs.length > 2);
+  fact("Region", groupName(k));
+  const estDd = fact("Established", "Loading…");
+  const areaDd = fact("Area", "Loading…");
+  const visDd = fact("Visitors a year", "Loading…");
+  const highDd = fact("Highest point", "Loading…");
+  const unit = code.slice(3).toLowerCase();
+  fact("Park service page", el("a", { href: `https://www.nps.gov/${unit}/`, target: "_blank", rel: "noopener", text: `nps.gov/${unit}` }), true);
+  const live = [estDd, areaDd, visDd, highDd];
+  live.forEach(d => d.classList.add("loading"));
   const about = el("p", { class: "about" });
   const src = el("p", { class: "hint src" });
-  const node = el("div", { class: "country-page" }, hero, about, src);
+  const node = el("div", { class: "country-page" }, hero, facts, about, src);
   parkPageCache = { code, node };
+  parkFacts(PARK_WIKI[code] || parkFullName(code)).catch(() => null).then(F => {
+    F = F || {};
+    estDd.textContent = F.established || "Not available";
+    areaDd.textContent = F.areaKm2 ? fmtArea(F.areaKm2) : "Not available";
+    visDd.textContent = F.visitors ? F.visitors.n.toLocaleString() + (F.visitors.y ? ` (${F.visitors.y})` : "") : "Not available";
+    highDd.textContent = F.highest || "Not available";
+    live.forEach(d => d.classList.remove("loading"));
+    src.dataset.facts = (F.established || F.areaKm2 || F.visitors || F.highest) ? " Facts: Wikidata." : "";
+    if (src.textContent) src.textContent = "Photo and description: Wikipedia." + src.dataset.facts;
+  });
   wikiSummary(PARK_WIKI[code] || parkFullName(code)).then(C => {
     if (C && C.extract && C.type !== "disambiguation") {
       const sentences = C.extract.match(/[^.!?]+[.!?]+(\s|$)/g) || [C.extract];
       about.replaceChildren(sentences.slice(0, 3).join("").trim() + " ",
         C.url ? el("a", { href: C.url, target: "_blank", rel: "noopener", text: "Read more on Wikipedia" }) : "");
       if (looksLikePhoto(C.thumb)) setWikiPhoto(photo, credit, bigThumb(C.thumb), `${C.title} · Wikipedia`);
-      src.textContent = "Photo and description: Wikipedia.";
+      src.textContent = "Photo and description: Wikipedia." + (src.dataset.facts || "");
     }
   }).catch(() => {});
   return node;
 }
+/* Park facts from Wikidata (established, area, yearly visitors, highest point), cached 14 days. */
+async function wikidataJson(params) {
+  const r = await fetch("https://www.wikidata.org/w/api.php?format=json&origin=*&" + params);
+  if (!r.ok) throw new Error("wikidata " + r.status);
+  return r.json();
+}
+async function parkFacts(title) {
+  const k = "park-v1-" + title, hit = cacheGet(k, 14 * DAY);
+  if (hit !== undefined) return hit;
+  const pj = await wikidataJson("action=wbgetentities&sites=enwiki&props=claims&titles=" + encodeURIComponent(title));
+  const ent = pj.entities && Object.values(pj.entities).find(e => e && e.claims);
+  if (!ent) { cacheSet(k, null); return null; }
+  const C = ent.claims;
+  const best = (pid) => {
+    const list = (C[pid] || []).filter(s => s.mainsnak && s.mainsnak.datavalue && s.rank !== "deprecated");
+    return list.find(s => s.rank === "preferred") || list[0] || null;
+  };
+  const out = {};
+  const t = best("P571") || best("P1619");
+  if (t) {
+    const v = t.mainsnak.datavalue.value, m = /^[+]?(\d{4})-(\d\d)-(\d\d)/.exec(v.time || "");
+    if (m) out.established = v.precision >= 11 && m[2] !== "00" && m[3] !== "00"
+      ? new Date(+m[1], +m[2] - 1, +m[3]).toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" })
+      : m[1];
+  }
+  const a = best("P2046");
+  if (a) {
+    const v = a.mainsnak.datavalue.value, n = parseFloat(v.amount), u = (v.unit || "").split("/").pop();
+    const km2 = { Q712226: 1, Q35852: 0.01, Q81292: 0.00404686, Q232291: 2.58999, Q25343: 1e-6 }[u];
+    if (km2 && isFinite(n)) out.areaKm2 = n * km2;
+  }
+  // Yearly visitors: the most recent year listed
+  const vis = (C.P1174 || []).filter(s => s.mainsnak && s.mainsnak.datavalue).map(s => {
+    const q = s.qualifiers && s.qualifiers.P585 && s.qualifiers.P585[0].datavalue;
+    return { n: parseFloat(s.mainsnak.datavalue.value.amount), y: q ? +(/(\d{4})/.exec(q.value.time) || [])[1] : 0 };
+  }).filter(x => isFinite(x.n)).sort((x, y) => y.y - x.y)[0];
+  if (vis) out.visitors = vis;
+  const hp = best("P610");
+  if (hp && hp.mainsnak.datavalue.value.id) {
+    try {
+      const id = hp.mainsnak.datavalue.value.id;
+      const lj = await wikidataJson("action=wbgetentities&props=labels&languages=en&ids=" + id);
+      const e = lj.entities && lj.entities[id];
+      if (e && e.labels && e.labels.en) out.highest = e.labels.en.value;
+    } catch {}
+  }
+  cacheSet(k, out);
+  return out;
+}
+const fmtArea = km2 => {
+  const acres = km2 * 247.105, sqmi = km2 / 2.58999;
+  return `${Math.round(acres).toLocaleString()} acres (${sqmi >= 10 ? Math.round(sqmi).toLocaleString() : sqmi.toFixed(1)} sq mi)`;
+};
 
 /* ---------- Stat tiles ---------- */
 let rankInfo = null;
