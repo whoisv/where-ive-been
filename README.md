@@ -66,6 +66,7 @@ flowchart LR
 | `countries-data.js` | Facts that rarely change, for about 200 countries: capital, currency, government, main religion, languages |
 | `schema.sql` | Creates the `visits` table, its security rules and the ranking function. Run once. |
 | `stats.sql` | The ranking function on its own, for databases set up before rankings were added |
+| `add-photos.sql` | Photos: private storage bucket, photos table (10 per place), sharing switch and community photos. Run once. |
 | `add-parks.sql` | National parks map: table, regions, leaderboard, rank and the 'parks' default view. Run once. |
 | `add-state-leaderboards.sql` | State leaderboards and state rank (run after add-states.sql). Run once. |
 | `add-states.sql` | Adds the States map's table (`state_visits`) and the default-view setting. Run once. |

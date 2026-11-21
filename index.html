@@ -122,6 +122,22 @@ button, input, textarea { font: inherit; color: inherit; }
 .share-btn { margin-left: auto; align-self: center; flex: none; display: inline-flex; align-items: center; gap: 6px; padding: 7px 13px; border-radius: 999px; border: 1.5px solid var(--accent); background: transparent; color: var(--accent); font-weight: 600; font-size: 13px; cursor: pointer; }
 .share-btn:hover { background: var(--accent); color: var(--accent-ink); }
 .share-btn:focus-visible { outline-offset: 2px; }
+.photos-sec h3 { display: flex; align-items: baseline; gap: 8px; }
+.ph-count { font-size: 12px; font-weight: 500; color: var(--muted); }
+.ph-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 6px; margin: 6px 0 10px; }
+.ph { position: relative; padding: 0; border: 0; border-radius: 8px; overflow: hidden; aspect-ratio: 1; background: var(--bg); cursor: zoom-in; }
+.ph img { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform .2s; }
+.ph:hover img { transform: scale(1.04); }
+.ph-by { position: absolute; left: 0; right: 0; bottom: 0; padding: 10px 6px 4px; font-size: 11px; color: #fff; text-align: left; background: linear-gradient(transparent, rgba(0,0,0,.65)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ph-others { margin-top: 14px; }
+.photo-box { position: relative; background: #0c1118; border-radius: 14px; overflow: hidden; width: min(1100px, calc(100vw - 32px)); max-height: calc(100vh - 32px); display: flex; flex-direction: column; }
+.photo-box > img { display: block; max-width: 100%; max-height: calc(100vh - 110px); object-fit: contain; margin: 0 auto; }
+.ph-close { position: absolute; top: 10px; right: 10px; z-index: 1; }
+.photo-bar { display: flex; align-items: center; gap: 10px; padding: 10px 12px; background: var(--surface); color: var(--ink); }
+.photo-meta { flex: 1; display: flex; align-items: center; gap: 10px; min-width: 0; }
+.photo-meta input { flex: 1; min-width: 0; }
+.ph-nav { width: 36px; height: 36px; border-radius: 50%; border: 0; background: var(--bg); font-size: 22px; line-height: 1; cursor: pointer; color: var(--ink); }
+.ph-del { border: 1px solid var(--danger); color: var(--danger); background: transparent; border-radius: 8px; padding: 6px 10px; cursor: pointer; white-space: nowrap; }
 .share-dlg { border: 0; padding: 0; background: transparent; max-width: none; max-height: none; color: var(--ink); }
 .share-dlg::backdrop { background: rgba(10, 16, 24, .55); backdrop-filter: blur(2px); }
 .share-box { background: var(--surface); border-radius: 16px; box-shadow: 0 20px 60px rgba(0,0,0,.35); width: min(940px, calc(100vw - 48px)); max-height: calc(100vh - 48px); display: flex; flex-direction: column; overflow: hidden; }
@@ -457,7 +473,7 @@ details.more .more-body { display: grid; gap: 18px; padding: 4px 12px 14px; }
 "use strict";
 
 /* Bump on every change so it's easy to see which version is live. */
-const APP_VERSION = "v1.22 · Nov 20, 2026 · preview";
+const APP_VERSION = "v1.22 · Nov 20, 2026 · preview 2";
 
 /* ---------- Reference data ---------- */
 const CONTINENTS = {
@@ -1200,6 +1216,13 @@ function openProfile() {
     el("label", { for: "profilePublic", style: "cursor:pointer;font-size:14.5px;text-transform:none;letter-spacing:0;color:var(--ink)" },
       el("b", { text: "Join the traveler community" }), el("br"),
       el("span", { class: "hint", text: "Compare your travels with others on leaderboards and more, by screen name, home and country counts. Your email, trips and notes stay private." })));
+  const sp = el("input", { type: "checkbox", id: "profileSharePhotos", checked: !!(myProfile && myProfile.share_photos), style: "width:18px;height:18px;accent-color:var(--accent);margin:0" });
+  const spRow = el("div", { style: "display:flex;gap:10px;align-items:flex-start;margin-top:10px" }, sp,
+    el("label", { for: "profileSharePhotos", style: "cursor:pointer;font-size:14.5px;text-transform:none;letter-spacing:0;color:var(--ink)" },
+      el("b", { text: "Share my photos with the traveler community" }), el("br"),
+      el("span", { class: "hint", text: "Other members see your photos on each place's page, under your screen name. Needs “Join the traveler community”. Off means only you see them." })));
+  const syncSp = () => { sp.disabled = !pub.checked; spRow.style.opacity = pub.checked ? "" : ".55"; };
+  pub.addEventListener("change", syncSp); syncSp();
   const form = el("form", { class: "sec", novalidate: true },
     el("label", { class: "field", for: "profileName" }, "Screen name", input),
     el("p", { class: "hint", text: `Shown instead of your email. Leave it blank to use ${session.user.email || "your email"}.` }),
@@ -1208,6 +1231,7 @@ function openProfile() {
     hcont,
     el("label", { class: "field", for: "profileView" }, "Open the app on", dvSel),
     pubRow,
+    spRow,
     save, msg);
   bindHome(hc, hs, hcont, typeof meta.home_country === "string" ? meta.home_country : "", typeof meta.home_state === "string" ? meta.home_state : "");
   const withTimeout = (promise, ms) => Promise.race([promise,
@@ -1238,6 +1262,10 @@ function openProfile() {
       const acct = await withTimeout(sb.auth.updateUser({ data: { screen_name: name, ...home, is_public: pub.checked, default_view: dvSel.value } }), 15000);
       const dvRes = await sb.from("profiles").update({ default_view: dvSel.value }).eq("user_id", session.user.id);
       if (!dvRes.error && myProfile) myProfile.default_view = dvSel.value;
+      const shareOn = pub.checked && sp.checked;
+      const spRes = await sb.from("profiles").update({ share_photos: shareOn }).eq("user_id", session.user.id);
+      if (!spRes.error && myProfile) myProfile.share_photos = shareOn;
+      else if (spRes.error && sp.checked) console.warn("Photo sharing not saved (run add-photos.sql)", spRes.error);
       if (acct.data && acct.data.user && session) session = { ...session, user: acct.data.user };
       setStatus("ok", signedInText());
       const homeTxt = homeText((session && session.user.user_metadata) || {});
@@ -1264,6 +1292,7 @@ function openProfile() {
     if (delInput.value.trim() !== "DELETE") return;
     delBtn.disabled = true; delBtn.textContent = "Deleting…"; delMsg.textContent = ""; delMsg.style.color = "";
     try {
+      await removeAllMyPhotos();
       const { error } = await sb.rpc("delete_my_account");
       if (error) {
         delMsg.textContent = /function|schema cache|does not exist/i.test(error.message || "")
@@ -1780,7 +1809,7 @@ function statePage(code) {
       const sentences = C.extract.match(/[^.!?]+[.!?]+(\s|$)/g) || [C.extract];
       about.replaceChildren(sentences.slice(0, 3).join("").trim() + " ",
         C.url ? el("a", { href: C.url, target: "_blank", rel: "noopener", text: "Read more on Wikipedia" }) : "");
-      if (looksLikePhoto(C.thumb)) { photo.src = bigThumb(C.thumb); credit.textContent = `${C.title} · Wikipedia`; }
+      if (looksLikePhoto(C.thumb)) setWikiPhoto(photo, credit, bigThumb(C.thumb), `${C.title} · Wikipedia`);
       src.textContent = "Description: Wikipedia.";
     }
   }).catch(() => {});
@@ -1855,7 +1884,7 @@ function parkPage(code) {
       const sentences = C.extract.match(/[^.!?]+[.!?]+(\s|$)/g) || [C.extract];
       about.replaceChildren(sentences.slice(0, 3).join("").trim() + " ",
         C.url ? el("a", { href: C.url, target: "_blank", rel: "noopener", text: "Read more on Wikipedia" }) : "");
-      if (looksLikePhoto(C.thumb)) { photo.src = bigThumb(C.thumb); credit.textContent = `${C.title} · Wikipedia`; }
+      if (looksLikePhoto(C.thumb)) setWikiPhoto(photo, credit, bigThumb(C.thumb), `${C.title} · Wikipedia`);
       src.textContent = "Photo and description: Wikipedia.";
     }
   }).catch(() => {});
@@ -2129,6 +2158,234 @@ function openDetail(code, fromList) {
   if (window.innerWidth <= 760) $("detailView").scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "start" });
   $("detail").querySelector(".back").focus({ preventScroll: true });
 }
+/* ---------- Photos: up to 10 per place, shrunk in the browser, private unless shared ---------- */
+const PHOTO_MAX = 10, PHOTO_EDGE = 1600, THUMB_EDGE = 480;
+const photoCache = {};          // place code -> { mine: [...], others: [...], at, err }
+let photosNotSetUp = false;     // true when add-photos.sql hasn't been run yet
+const thumbPath = path => path.replace(/\.jpg$/, "_t.jpg");
+const newId = () => (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : rid() + rid() + rid();
+
+async function signUrls(paths) {
+  const out = {};
+  if (!paths.length) return out;
+  const { data } = await sb.storage.from("photos").createSignedUrls(paths, 3600);
+  (data || []).forEach(d => { if (d && d.signedUrl && d.path) out[d.path] = d.signedUrl; });
+  return out;
+}
+async function loadPhotos(code, force) {
+  if (!sb || !session) return null;
+  const hit = photoCache[code];
+  if (!force && hit && Date.now() - hit.at < 45 * 60000) return hit;
+  const mineQ = await sb.from("photos").select("id,path,caption,created_at")
+    .eq("user_id", session.user.id).eq("place_code", code).order("created_at");
+  if (mineQ.error) {
+    photosNotSetUp = /relation|does not exist|schema cache|not found/i.test(mineQ.error.message || "");
+    return (photoCache[code] = { mine: [], others: [], at: Date.now(), err: mineQ.error.message || "error" });
+  }
+  photosNotSetUp = false;
+  const comm = await sb.rpc("community_photos", { place: code, max_rows: 24 });
+  const mine = mineQ.data || [], others = comm.error ? [] : (comm.data || []);
+  const all = [...mine, ...others];
+  const urls = await signUrls([...all.map(p => p.path), ...all.map(p => thumbPath(p.path))]);
+  all.forEach(p => { p.url = urls[p.path] || ""; p.thumb = urls[thumbPath(p.path)] || p.url; });
+  return (photoCache[code] = { mine: mine.filter(p => p.url), others: others.filter(p => p.url), at: Date.now(), err: null });
+}
+
+/* Decode (respecting the camera's rotation), shrink, and re-encode as JPEG. */
+async function decodeImage(file) {
+  try { return await createImageBitmap(file, { imageOrientation: "from-image" }); }
+  catch {
+    const u = URL.createObjectURL(file);
+    try {
+      return await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = () => rej(new Error("decode")); i.src = u; });
+    } finally { setTimeout(() => URL.revokeObjectURL(u), 1000); }
+  }
+}
+function toJpeg(img, edge, quality) {
+  const w0 = img.width || img.naturalWidth, h0 = img.height || img.naturalHeight;
+  const s = Math.min(1, edge / Math.max(w0, h0));
+  const w = Math.max(1, Math.round(w0 * s)), h = Math.max(1, Math.round(h0 * s));
+  const cv = document.createElement("canvas"); cv.width = w; cv.height = h;
+  const g = cv.getContext("2d"); g.fillStyle = "#fff"; g.fillRect(0, 0, w, h); g.drawImage(img, 0, 0, w, h);
+  return new Promise((res, rej) => cv.toBlob(b => b ? res(b) : rej(new Error("encode")), "image/jpeg", quality));
+}
+async function shrinkPhoto(file) {
+  const img = await decodeImage(file);
+  let big = await toJpeg(img, PHOTO_EDGE, 0.82);
+  if (big.size > 1900000) big = await toJpeg(img, 1280, 0.75);
+  const small = await toJpeg(img, THUMB_EDGE, 0.75);
+  if (img.close) img.close();
+  return { big, small };
+}
+
+async function addPhotos(code, files, say) {
+  const have = (photoCache[code] && photoCache[code].mine.length) || 0;
+  const room = PHOTO_MAX - have;
+  const picked = [...files];
+  if (room <= 0) { say(`You already have ${PHOTO_MAX} photos here. Delete one to add another.`, true); return; }
+  const todo = picked.slice(0, room);
+  let added = 0, failed = [];
+  for (let i = 0; i < todo.length; i++) {
+    const f = todo[i];
+    say(`Shrinking and uploading ${i + 1} of ${todo.length}…`);
+    let shr;
+    try { shr = await shrinkPhoto(f); }
+    catch { failed.push(`${f.name} (this browser can't open that format; try a JPEG or PNG)`); continue; }
+    const path = `${session.user.id}/${code}/${newId()}.jpg`;
+    const st = sb.storage.from("photos");
+    const up = await st.upload(path, shr.big, { contentType: "image/jpeg", upsert: false });
+    if (up.error) { failed.push(`${f.name} (${up.error.message || "upload failed"})`); continue; }
+    await st.upload(thumbPath(path), shr.small, { contentType: "image/jpeg", upsert: false });
+    const ins = await sb.from("photos").insert({ place_code: code, path });
+    if (ins.error) {
+      await st.remove([path, thumbPath(path)]);
+      failed.push(`${f.name} (${/10 photos/.test(ins.error.message || "") ? "limit of 10 reached" : ins.error.message || "save failed"})`);
+      continue;
+    }
+    added++;
+  }
+  await loadPhotos(code, true);
+  const skipped = picked.length - todo.length;
+  const parts = [];
+  if (added) parts.push(`Added ${added} photo${added === 1 ? "" : "s"}.`);
+  if (skipped) parts.push(`${skipped} skipped: the limit is ${PHOTO_MAX} per place.`);
+  if (failed.length) parts.push(`Couldn't add: ${failed.join("; ")}.`);
+  say(parts.join(" "), failed.length > 0 && !added);
+}
+async function deletePhoto(code, p) {
+  const del = await sb.from("photos").delete().eq("id", p.id);
+  if (del.error) { toast("Couldn't delete the photo"); return false; }
+  await sb.storage.from("photos").remove([p.path, thumbPath(p.path)]);
+  await loadPhotos(code, true);
+  return true;
+}
+
+/* Your first photo of a place becomes its banner; the Wikipedia photo comes back when there are none. */
+function setWikiPhoto(photo, credit, src, text) {
+  photo.dataset.wikiSrc = src; credit.dataset.wiki = text;
+  if (!photo.dataset.mine) { photo.src = src; credit.textContent = text; }
+}
+function setBanner(page, url) {
+  const hero = page && page.querySelector(".hero");
+  if (!hero) return;
+  let img = hero.querySelector(".hero-photo");
+  const credit = hero.querySelector(".hero-credit");
+  if (url) {
+    if (!img) { img = el("img", { class: "hero-photo", alt: "" }); img.addEventListener("load", () => img.classList.add("ready")); hero.prepend(img); }
+    if (img.dataset.mine !== url) { img.classList.remove("ready"); img.dataset.mine = url; img.src = url; }
+    if (credit) credit.textContent = "Your photo";
+  } else if (img && img.dataset.mine) {
+    delete img.dataset.mine;
+    img.classList.remove("ready");
+    if (img.dataset.wikiSrc) { img.src = img.dataset.wikiSrc; if (credit) credit.textContent = credit.dataset.wiki || ""; }
+    else { img.removeAttribute("src"); if (credit) credit.textContent = ""; }
+  }
+}
+
+function sharingPhotos() { return !!(myProfile && myProfile.is_public && myProfile.share_photos); }
+
+function photoSection(code, page) {
+  const sec = el("section", { class: "sec photos-sec" });
+  if (!sb || !session) return null;
+  const ro = !canEdit();
+  const msg = el("p", { class: "hint", "aria-live": "polite" });
+  const say = (text, bad) => { msg.textContent = text || ""; msg.style.color = bad ? "var(--danger)" : ""; };
+  const input = el("input", { type: "file", accept: "image/*", multiple: true, hidden: true, id: "photoInput" });
+  const addBtn = el("button", { type: "button", class: "add", disabled: ro }, "+ Add photos");
+  addBtn.onclick = () => input.click();
+  input.addEventListener("change", async () => {
+    const files = input.files; if (!files || !files.length) return;
+    addBtn.disabled = true;
+    try { await addPhotos(code, files, say); } finally { input.value = ""; addBtn.disabled = ro; draw(); }
+  });
+
+  function grid(list, mine) {
+    return el("div", { class: "ph-grid" }, list.map((p, i) =>
+      el("button", { type: "button", class: "ph", "aria-label": mine ? `Open your photo ${i + 1}` : `Open photo by ${p.screen_name}`,
+        onclick: () => openPhoto(code, list, i, mine, page, draw) },
+        el("img", { src: p.thumb, alt: p.caption || "", loading: "lazy" }),
+        mine ? null : el("span", { class: "ph-by", text: p.screen_name }))));
+  }
+  function draw() {
+    const d = photoCache[code];
+    if (selected !== code) return;
+    if (!d) { sec.replaceChildren(el("h3", { text: "Your photos" }), el("p", { class: "hint", text: "Loading photos…" })); return; }
+    if (photosNotSetUp) {
+      sec.replaceChildren(el("h3", { text: "Your photos" }),
+        el("p", { class: "hint", text: "Photos aren't set up yet. The site owner needs to run add-photos.sql in Supabase." }));
+      return;
+    }
+    setBanner(page, d.mine.length ? d.mine[0].url : null);
+    const n = d.mine.length;
+    const kids = [
+      el("h3", {}, "Your photos ", el("span", { class: "ph-count", text: `${n} of ${PHOTO_MAX}` })),
+      n ? grid(d.mine, true) : el("p", { class: "hint", text: "Add up to 10 photos. They're shrunk on your device before uploading, and your first one becomes this page's banner." }),
+      n < PHOTO_MAX ? addBtn : null, input, msg,
+      el("p", { class: "hint", text: sharingPhotos()
+        ? "Shared with the traveler community, by your screen name. Change this in Profile."
+        : "Only you can see your photos. To share them, turn on “Share my photos” in Profile." })
+    ];
+    if (d.others.length) kids.push(el("h3", { class: "ph-others", text: "From other travelers" }), grid(d.others, false));
+    sec.replaceChildren(...kids);
+  }
+  draw();
+  loadPhotos(code).then(draw).catch(() => {});
+  return sec;
+}
+
+/* Full-size viewer */
+function openPhoto(code, list, start, mine, page, after) {
+  let dlg = $("photoDlg");
+  if (!dlg) { dlg = el("dialog", { class: "share-dlg photo-dlg", id: "photoDlg", "aria-label": "Photo" }); document.body.append(dlg); }
+  let i = start;
+  const show = () => {
+    const p = list[i];
+    const cap = el("input", { type: "text", maxlength: "200", value: p.caption || "", placeholder: "Add a caption", disabled: !mine || !canEdit(), "aria-label": "Caption" });
+    cap.addEventListener("change", async () => {
+      const v = cap.value.trim();
+      const r = await sb.from("photos").update({ caption: v }).eq("id", p.id);
+      if (r.error) toast("Couldn't save the caption"); else { p.caption = v; toast("Caption saved"); }
+    });
+    let confirmDelete = false;
+    const del = mine && canEdit() ? el("button", { type: "button", class: "ph-del" }, "Delete photo") : null;
+    if (del) del.onclick = async () => {
+      if (!confirmDelete) { confirmDelete = true; del.textContent = "Tap again to delete"; return; }
+      del.disabled = true;
+      if (await deletePhoto(code, p)) { dlg.close(); after(); toast("Photo deleted"); }
+      else del.disabled = false;
+    };
+    const nav = (d) => { i = (i + d + list.length) % list.length; show(); };
+    dlg.replaceChildren(el("div", { class: "photo-box" },
+      el("button", { type: "button", class: "share-x ph-close", "aria-label": "Close", onclick: () => dlg.close() }, "✕"),
+      el("img", { src: p.url, alt: p.caption || "" }),
+      el("div", { class: "photo-bar" },
+        list.length > 1 ? el("button", { type: "button", class: "ph-nav", "aria-label": "Previous photo", onclick: () => nav(-1) }, "‹") : null,
+        el("div", { class: "photo-meta" },
+          mine ? cap : el("span", {}, p.caption ? p.caption + " · " : "", el("b", { text: p.screen_name })),
+          el("span", { class: "hint", text: `${i + 1} of ${list.length}` })),
+        list.length > 1 ? el("button", { type: "button", class: "ph-nav", "aria-label": "Next photo", onclick: () => nav(1) }, "›") : null,
+        del)));
+  };
+  dlg.onkeydown = e => {
+    if (e.target.tagName === "INPUT") return;
+    if (e.key === "ArrowLeft" && list.length > 1) { i = (i - 1 + list.length) % list.length; show(); }
+    if (e.key === "ArrowRight" && list.length > 1) { i = (i + 1) % list.length; show(); }
+  };
+  dlg.onclick = e => { if (e.target === dlg) dlg.close(); };
+  show();
+  if (!dlg.open) dlg.showModal();
+}
+
+/* Remove every photo file before the account goes (Supabase doesn't allow deleting files from SQL). */
+async function removeAllMyPhotos() {
+  try {
+    const { data, error } = await sb.from("photos").select("path").eq("user_id", session.user.id);
+    if (error || !data || !data.length) return;
+    const paths = data.flatMap(r => [r.path, thumbPath(r.path)]);
+    for (let k = 0; k < paths.length; k += 100) await sb.storage.from("photos").remove(paths.slice(k, k + 100));
+  } catch (e) { console.warn("Photo cleanup failed", e); }
+}
+
 function closeDetail() {
   selected = null;
   showView(session ? "list" : "auth");
@@ -2252,7 +2509,7 @@ function countryPage(code) {
     let pic = null;
     if (CAP && looksLikePhoto(CAP.thumb)) pic = { url: bigThumb(CAP.thumb), label: CAP.title };
     else if (C && looksLikePhoto(C.thumb)) pic = { url: bigThumb(C.thumb), label: C.title };
-    if (pic) { photo.src = pic.url; credit.textContent = `${pic.label} · Wikipedia`; }
+    if (pic) setWikiPhoto(photo, credit, pic.url, `${pic.label} · Wikipedia`);
     src.dataset.wiki = (C || CAP) ? "Photo and description: Wikipedia." : "";
     writeSources();
   });
@@ -2304,14 +2561,16 @@ function renderDetail() {
     oninput: e => edit(code, n => { n.notes = e.target.value; }) });
   notes.value = r.notes;
 
+  const page = isParkCode(code) ? parkPage(code) : isStateCode(code) ? statePage(code) : countryPage(code);
   box.replaceChildren(
     el("button", { type: "button", class: "back", onclick: closeDetail }, "← All countries"),
-    (isParkCode(code) ? parkPage(code) : isStateCode(code) ? statePage(code) : countryPage(code)),
+    page,
     el("button", { type: "button", class: "visit-btn" + (r.visited ? " on" : ""), disabled: ro, "aria-pressed": String(r.visited),
       onclick: () => setVisited(code, !r.visited) }, r.visited ? "✓ Visited" : "Mark as visited"),
     el("section", { class: "sec" },
       el("label", { class: "field", for: "firstYear" }, "Year first visited (optional)", yearInput),
       yearHint),
+    photoSection(code, page),
     moreDetails(code, r,
     el("section", { class: "sec" },
       el("h3", { text: r.trips.length ? `Trips (${r.trips.length})` : "Trips" }),
