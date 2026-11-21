@@ -2,13 +2,12 @@
 
 Releases of Where I've Been. Each release is one production deploy; the version shows in the map's bottom-right corner.
 
-## Pending release (on `preview`, not yet live)
-- v1.22: The third map is called "National Parks" (switcher, Profile and Help), not "Parks".
-- v1.22 preview 2: Photos. Up to 10 per place (country, state or national park), added from the place's page. Shrunk on your device before upload (about 1600 px, usually 150–400 KB, plus a small thumbnail). Your first photo becomes the page's banner. Click to view full size, add a caption, step through, or delete. Private by default; Profile has "Share my photos with the traveler community" (needs community membership), and shared photos appear to other members under "From other travelers" with the screen name. Deleting your account deletes your photos. Requires add-photos.sql.
-- v1.22 preview 3–4: The photo viewer is a larger, fixed-size window (up to 900 × 700) so photos stay sharp; full screen on phones.
-- v1.22 preview 5: National park pages get a facts section like country pages: state(s), region, date established, area (acres and square miles), visitors a year (latest year), highest point, and a link to the park's nps.gov page. Facts come live from Wikidata.
+## v1.22 · Nov 21, 2026 (live)
+- The third map is called "National Parks" (switcher, Profile and Help), not "Parks".
+- Photos. Up to 10 per place (country, state or national park), added from the place's page. Shrunk on your device before upload (about 1600 px, usually 150–400 KB, plus a small thumbnail). Your first photo becomes the page's banner. Click to view in a viewer up to 900 × 700 (full screen on phones), add a caption, step through, or delete. Private by default; Profile has "Share my photos with the traveler community" (needs community membership), and shared photos appear to other members under "From other travelers" with the screen name. Deleting your account deletes your photos. Requires add-photos.sql.
+- National park pages get a facts section like country pages: state(s), region, date established, area (acres and square miles), visitors a year (latest year), highest point, and a link to the park's nps.gov page. Facts come live from Wikidata.
 
-## v1.21 · Nov 20, 2026 (live)
+## v1.21 · Nov 20, 2026
 Includes v1.19 and v1.20.
 - Share my map opens as a pop-up over the page (full screen on phones) instead of below the panel, with the preview on the left and size, look and Share/Download on the right. Close with ✕, Esc or a click outside.
 - Admin "Give access" button (also opens from any "Not confirmed" tag in the traveler list). Type an email; it checks for an account, then sends the right email through the site's email service: a sign-in link that creates the account (new people), the confirmation email again (never confirmed), or a password reset link (confirmed). Backup: set a temporary password and send it yourself by email, text or copy. People set up this way choose their own password right after signing in. Requires admin-access.sql.
