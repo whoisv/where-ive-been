@@ -453,7 +453,7 @@ details.more .more-body { display: grid; gap: 18px; padding: 4px 12px 14px; }
 "use strict";
 
 /* Bump on every change so it's easy to see which version is live. */
-const APP_VERSION = "v1.21 · Nov 20, 2026 · preview 3";
+const APP_VERSION = "v1.21 · Nov 20, 2026 · preview 4";
 
 /* ---------- Reference data ---------- */
 const CONTINENTS = {
@@ -665,8 +665,10 @@ function refreshRank(delay) {
   clearTimeout(rankTimer);
   rankTimer = setTimeout(async () => {
     if (!sb || !session) return;
-    const { data, error } = await sb.rpc("my_travel_stats");
-    if (!error && data) { rankInfo = data; renderSummary(); }
+    const [c, st] = await Promise.all([sb.rpc("my_travel_stats"), sb.rpc("my_state_stats")]);
+    if (!c.error && c.data) rankInfo = c.data;
+    if (!st.error && st.data) stateRankInfo = st.data;
+    renderSummary();
   }, delay || 0);
 }
 
@@ -765,19 +767,21 @@ async function saveProfile(fields) {
 function boardArgs(mode) {
   if (mode === "year") return { board: "year", filter_value: null };
   if (mode.startsWith("continent:")) return { board: "continent", filter_value: mode.slice(10) };
+  if (mode.startsWith("region:")) return { board: "region", filter_value: mode.slice(7) };
   if (mode === "home") return { board: "home", filter_value: myProfile && myProfile.home_country || "" };
   if (mode === "state") return { board: "state", filter_value: myProfile ? `${myProfile.home_country}|${myProfile.home_state}` : "" };
   return { board: "all", filter_value: null };
 }
 async function loadBoard(force) {
   if (!sb || !session) return;
-  const key = boardMode;
+  const mode = boardMode, v = view, key = v + ":" + mode;
   const hit = boardCache[key];
   if (!force && hit && Date.now() - hit.at < 60000) return;
   boardCache[key] = { at: Date.now(), rows: hit ? hit.rows : null, loading: true };
-  const { data, error } = await sb.rpc("leaderboard", { ...boardArgs(key), max_rows: 50 });
+  const fn = v === "states" ? "state_leaderboard" : "leaderboard";
+  const { data, error } = await sb.rpc(fn, { ...boardArgs(mode), max_rows: 50 });
   boardCache[key] = { at: Date.now(), rows: error ? null : (data || []), error: error ? (error.message || "error") : null };
-  if (tab === "board" && boardMode === key) renderBoard();
+  if (tab === "board" && boardMode === mode && view === v) renderBoard();
 }
 
 function renderBoard() {
@@ -785,13 +789,16 @@ function renderBoard() {
   ul.replaceChildren();
   const yr = new Date().getFullYear();
   const sel = el("select", { id: "boardSel", "aria-label": "Choose a leaderboard" });
-  const opts = [["all", "Most countries · all travelers"], ["year", `Most countries visited in ${yr}`]];
-  CONT_AZ.map(k => CONTINENTS[k][0]).forEach(n => opts.push(["continent:" + n, `Most of ${n}`]));
+  const N = NOUN(), states = view === "states";
+  const opts = [["all", `Most ${N.many} · all travelers`], ["year", `Most ${N.many} visited in ${yr}`]];
+  if (states) REGION_AZ.map(k => STATE_REGIONS[k][0]).forEach(n => opts.push(["region:" + n, `Most of the ${n}`]));
+  else CONT_AZ.map(k => CONTINENTS[k][0]).forEach(n => opts.push(["continent:" + n, `Most of ${n}`]));
   if (myProfile && myProfile.home_country) opts.push(["home", `From ${myProfile.home_country_name || myProfile.home_country}`]);
   if (myProfile && myProfile.home_country && myProfile.home_state) opts.push(["state", `From ${myProfile.home_state}`]);
   if (!opts.some(o => o[0] === boardMode)) boardMode = "all";
   opts.forEach(([v, label]) => sel.append(el("option", { value: v, selected: v === boardMode }, label)));
   sel.onchange = () => { boardMode = sel.value; loadBoard(false); renderBoard(); };
+  if (!boardCache[view + ":" + boardMode]) loadBoard(false);
   const tools = el("li", { class: "board-tools", style: "display:grid;grid-template-columns:1fr" }, sel);
   ul.append(tools);
 
@@ -805,16 +812,17 @@ function renderBoard() {
       el("button", { type: "button", class: "linkbtn", onclick: openProfile }, "Join in Profile"),
       " to appear by screen name. Your email, trips and notes are never shown."));
   }
-  const c = boardCache[boardMode];
+  const c = boardCache[view + ":" + boardMode];
   if (!c || c.loading && !c.rows) { ul.append(el("li", { class: "board-note", style: "display:block", text: "Loading…" })); return; }
-  if (c.error) { ul.append(el("li", { class: "board-note", style: "display:block", text: "Couldn't load this leaderboard. If you haven't yet, run leaderboard.sql in Supabase." })); return; }
+  if (c.error) { ul.append(el("li", { class: "board-note", style: "display:block", text: `Couldn't load this leaderboard. If you haven't yet, run ${states ? "add-state-leaderboards.sql" : "leaderboard.sql"} in Supabase.` })); return; }
   if (!c.rows.length) { ul.append(el("li", { class: "board-note", style: "display:block", text: "Nobody on this board yet. Be the first!" })); return; }
-  const unit = boardMode === "year" ? `in ${yr}` : boardMode.startsWith("continent:") ? `in ${boardMode.slice(10)}` : "countries";
+  const unit = boardMode === "year" ? `in ${yr}` : boardMode.startsWith("continent:") ? `in ${boardMode.slice(10)}`
+    : boardMode.startsWith("region:") ? `in the ${boardMode.slice(7)}` : N.many;
   const lb = el("ol", { class: "lb" });
   c.rows.forEach(r => {
     lb.append(el("li", { class: r.is_me ? "me" : "" },
       el("span", { class: "r", text: String(r.rank) }),
-      el("span", { class: "who" }, el("b", { text: r.screen_name + (r.is_me ? " (you)" : "") }), el("span", { text: r.home || `${r.continents} continent${r.continents == 1 ? "" : "s"}` })),
+      el("span", { class: "who" }, el("b", { text: r.screen_name + (r.is_me ? " (you)" : "") }), el("span", { text: r.home || `${r.continents} ${r.continents == 1 ? N.groupOne : N.group}` })),
       el("span", { class: "sc" }, String(r.score), el("small", { text: unit }))));
   });
   ul.append(el("li", { style: "display:block;padding:0" }, lb));
@@ -1220,7 +1228,7 @@ function handleSession(s, event) {
     linkErrorMsg = "";
     if (prev !== s.user.id) { setTimeout(loadRecords, 0); checkAdmin(); }
   } else {
-    records = {}; selected = null; rankInfo = null; earnedBefore = null; myProfile = null; Object.keys(boardCache).forEach(k => delete boardCache[k]); P.mode = "signedout";
+    records = {}; selected = null; rankInfo = null; stateRankInfo = null; earnedBefore = null; myProfile = null; Object.keys(boardCache).forEach(k => delete boardCache[k]); P.mode = "signedout";
     setStatus(null, "Not signed in");
     setAuthMode(authMode === "reset" ? "signin" : authMode);
     if (linkErrorMsg) authMsg(linkErrorMsg, true);
@@ -1640,6 +1648,7 @@ function switchView(v) {
   selected = null;
   if (!$("detailView").hidden) showView(session ? "list" : "auth");
   $("tip").classList.remove("show");
+  if (tab === "board") loadBoard(false);
   renderAll();
 }
 $("vCountries").addEventListener("click", () => { viewChosen = true; if (view !== "countries") switchView("countries"); });
@@ -1678,7 +1687,8 @@ function statePage(code) {
 }
 
 /* ---------- Stat tiles ---------- */
-let rankInfo = null;   // {travelers, my_count, rank, average, top} from the database, when available
+let rankInfo = null;
+let stateRankInfo = null;   // the same, for the States map   // {travelers, my_count, rank, average, top} from the database, when available
 function tripDays(t) {
   if (!isDate(t.from) || !isDate(t.to)) return 0;
   const d = Math.round((Date.parse(t.to) - Date.parse(t.from)) / 86400000) + 1;
@@ -1694,12 +1704,13 @@ function renderTiles(visited) {
   const thisYear = visited.filter(c => { const r = rec(c.code); return String(r.firstYear) === yr || r.trips.some(t => (t.from || t.to).startsWith(yr)); }).length;
   const tile = (big, small, cls, title) => el("div", { class: "tile" + (cls ? " " + cls : ""), title }, el("b", { text: String(big) }), el("span", { text: small }));
   const out = [];
-  if (view === "countries" && rankInfo && rankInfo.travelers) {
-    out.push(rankInfo.rank && visited.length
-      ? tile("#" + rankInfo.rank, `of ${rankInfo.travelers} traveler${rankInfo.travelers === 1 ? "" : "s"}` +
-          (rankInfo.percentile != null && rankInfo.travelers > 1 ? ` · ahead of ${rankInfo.percentile}%` : ""), "rank",
-          `Average traveler: ${rankInfo.average} countries. Most traveled: ${rankInfo.top}.`)
-      : tile("—", `${rankInfo.travelers} traveler${rankInfo.travelers === 1 ? "" : "s"} so far`, "rank"));
+  const ri = view === "states" ? stateRankInfo : rankInfo;
+  if (ri && ri.travelers) {
+    out.push(ri.rank && visited.length
+      ? tile("#" + ri.rank, `of ${ri.travelers} traveler${ri.travelers === 1 ? "" : "s"}` +
+          (ri.percentile != null && ri.travelers > 1 ? ` · ahead of ${ri.percentile}%` : ""), "rank",
+          `Average traveler: ${ri.average} ${NOUN().many}. Most traveled: ${ri.top}.`)
+      : tile("—", `${ri.travelers} traveler${ri.travelers === 1 ? "" : "s"} so far`, "rank"));
   }
   out.push(tile(`${contsVisited}/${contsTotal}`, NOUN().group));
   // Date-based tiles appear only once someone has entered years or dated trips.
@@ -1850,10 +1861,6 @@ function renderSummary() {
 }
 
 function renderList() {
-  if (tab === "board" && view === "states") {
-    $("list").replaceChildren(el("li", { class: "board-note", style: "display:block", text: "State leaderboards are coming soon. Switch to Countries to see the country leaderboards." }));
-    return;
-  }
   if (tab === "board") { renderBoard(); return; }
   const q = $("search").value.trim().toLowerCase();
   let items = currentList.filter(c => !q || c.name.toLowerCase().includes(q) || c.code.toLowerCase() === q || (isStateCode(c.code) && c.code.slice(3).toLowerCase() === q));
