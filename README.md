@@ -8,6 +8,7 @@ A travel map anyone can sign up for. Each person marks the countries they've vis
 
 - **World map colored by continent.** Visited countries show in full color and the rest are pale. Double-click a country to toggle it.
 - **Country pages** with a photo, the flag, capital, population, GDP, GDP per person, currency, government, main religion, languages and a short description.
+- **Your photos:** up to 10 per place, shrunk on your device before upload; your first becomes the banner. Private unless you share them with the traveler community.
 - **Trips and notes** for each country, with arrival and departure dates.
 - **Stats:** "X of Y countries", share of the world, continents visited, days on the road, countries visited this year, and a percentage for each continent.
 - **Rank among all travelers** and your percentile, worked out without revealing anyone's countries.
