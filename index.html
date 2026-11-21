@@ -318,11 +318,14 @@ details.more .more-body { display: grid; gap: 18px; padding: 4px 12px 14px; }
 .help details > p, .help details > ul { padding-bottom: 12px; }
 .help .contact { border: 1px solid var(--line); border-radius: 10px; padding: 12px; background: var(--bg); }
 /* Countries | States switcher */
-.viewsw { display: inline-grid; grid-template-columns: 1fr 1fr; gap: 2px; padding: 3px; border-radius: 10px; background: var(--bg); border: 1px solid var(--line); justify-self: start; }
+.viewsw { display: inline-grid; grid-template-columns: repeat(3, auto); gap: 2px; padding: 3px; border-radius: 10px; background: var(--bg); border: 1px solid var(--line); justify-self: start; }
 .viewsw button { border: 0; background: none; padding: 6px 16px; border-radius: 7px; font-weight: 600; font-size: 13.5px; color: var(--muted); cursor: pointer; }
 .viewsw button[aria-selected="true"] { background: var(--surface); color: var(--ink); box-shadow: 0 1px 3px rgba(0,0,0,.12); }
 /* State regions reuse the continent palette */
 .cont-MW { --cc: var(--c-AF); } .cont-NE { --cc: var(--c-EU); } .cont-SO { --cc: var(--c-AS); } .cont-TR { --cc: var(--c-OC); } .cont-WE { --cc: var(--c-NA); }
+.cont-PAK { --cc: var(--c-AN); } .cont-PEA { --cc: var(--c-EU); } .cont-PMW { --cc: var(--c-AF); } .cont-PMO { --cc: var(--c-SA); }
+.cont-PPA { --cc: var(--c-NA); } .cont-PSO { --cc: var(--c-AS); } .cont-PTR { --cc: var(--c-OC); }
+.country.dot.park { stroke-width: 1.5; }
 .map-label { font-family: var(--font-body); font-size: 11px; fill: var(--muted); pointer-events: none; }
 .map-note { position: absolute; inset: 0; display: grid; place-items: center; color: var(--muted); padding: 24px; text-align: center; pointer-events: none; }
 .toast { position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); background: var(--ink); color: var(--bg); padding: 8px 14px; border-radius: 8px; font-size: 13px; opacity: 0; pointer-events: none; transition: opacity .2s; }
@@ -366,6 +369,7 @@ details.more .more-body { display: grid; gap: 18px; padding: 4px 12px 14px; }
       <div class="viewsw" role="tablist" aria-label="Choose a map">
         <button type="button" role="tab" id="vCountries" aria-selected="true">Countries</button>
         <button type="button" role="tab" id="vStates" aria-selected="false">States</button>
+        <button type="button" role="tab" id="vParks" aria-selected="false">Parks</button>
       </div>
       <div class="me-line" id="meLine" hidden></div>
       <div class="big"><strong id="count">0</strong><span id="countLabel">countries visited</span><button type="button" class="share-btn" id="shareBtn" hidden>Share my map</button></div>
@@ -453,7 +457,7 @@ details.more .more-body { display: grid; gap: 18px; padding: 4px 12px 14px; }
 "use strict";
 
 /* Bump on every change so it's easy to see which version is live. */
-const APP_VERSION = "v1.21 · Nov 20, 2026 · preview 4";
+const APP_VERSION = "v1.21 · Nov 20, 2026 · preview 5";
 
 /* ---------- Reference data ---------- */
 const CONTINENTS = {
@@ -469,7 +473,7 @@ const CONTINENTS = {
 const CONT_AZ = ["AF", "AN", "AS", "EU", "NA", "OC", "SA"];
 const contOf = {};
 for (const [k, [, list]] of Object.entries(CONTINENTS)) list.split(" ").forEach(c => contOf[c] = k);
-const contName = code => (CONTINENTS[contOf[code]] || STATE_REGIONS[contOf[code]] || ["Other"])[0];
+const contName = code => (CONTINENTS[contOf[code]] || STATE_REGIONS[contOf[code]] || PARK_REGIONS[contOf[code]] || ["Other"])[0];
 
 /* ---------- States: the second map (US states + territories, grouped by Census region) ---------- */
 const STATE_REGIONS = {
@@ -490,6 +494,81 @@ const STATE_NAMES = {
 };
 for (const [k, [, list]] of Object.entries(STATE_REGIONS)) list.split(" ").forEach(a => contOf["US-" + a] = k);
 const isStateCode = c => /^US-[A-Z]{2}$/.test(c);
+
+/* ---------- National parks: the third map (the 64 parks designated "National Park") ---------- */
+// [code, name (without "National Park"), state(s), region, latitude, longitude]
+const NATIONAL_PARKS = [
+  ["NP-ACAD", "Acadia", "ME", "PEA", 44.35, -68.21],
+  ["NP-NPSA", "American Samoa", "AS", "PTR", -14.25, -170.68],
+  ["NP-ARCH", "Arches", "UT", "PMO", 38.68, -109.57],
+  ["NP-BADL", "Badlands", "SD", "PMW", 43.75, -102.5],
+  ["NP-BIBE", "Big Bend", "TX", "PSO", 29.25, -103.25],
+  ["NP-BISC", "Biscayne", "FL", "PSO", 25.65, -80.08],
+  ["NP-BLCA", "Black Canyon of the Gunnison", "CO", "PMO", 38.57, -107.72],
+  ["NP-BRCA", "Bryce Canyon", "UT", "PMO", 37.57, -112.18],
+  ["NP-CANY", "Canyonlands", "UT", "PMO", 38.2, -109.93],
+  ["NP-CARE", "Capitol Reef", "UT", "PMO", 38.2, -111.17],
+  ["NP-CAVE", "Carlsbad Caverns", "NM", "PMO", 32.17, -104.44],
+  ["NP-CHIS", "Channel Islands", "CA", "PPA", 34.01, -119.42],
+  ["NP-CHIR", "Chiricahua", "AZ", "PMO", 32.01, -109.35],
+  ["NP-CONG", "Congaree", "SC", "PEA", 33.78, -80.78],
+  ["NP-CRLA", "Crater Lake", "OR", "PPA", 42.94, -122.1],
+  ["NP-CUVA", "Cuyahoga Valley", "OH", "PMW", 41.24, -81.55],
+  ["NP-DEVA", "Death Valley", "CA, NV", "PPA", 36.24, -116.82],
+  ["NP-DENA", "Denali", "AK", "PAK", 63.33, -150.5],
+  ["NP-DRTO", "Dry Tortugas", "FL", "PSO", 24.63, -82.87],
+  ["NP-EVER", "Everglades", "FL", "PSO", 25.32, -80.93],
+  ["NP-GAAR", "Gates of the Arctic", "AK", "PAK", 67.78, -153.3],
+  ["NP-JEFF", "Gateway Arch", "MO", "PMW", 38.63, -90.19],
+  ["NP-GLAC", "Glacier", "MT", "PMO", 48.8, -114.0],
+  ["NP-GLBA", "Glacier Bay", "AK", "PAK", 58.5, -137.0],
+  ["NP-GRCA", "Grand Canyon", "AZ", "PMO", 36.06, -112.14],
+  ["NP-GRTE", "Grand Teton", "WY", "PMO", 43.73, -110.8],
+  ["NP-GRBA", "Great Basin", "NV", "PMO", 38.98, -114.3],
+  ["NP-GRSA", "Great Sand Dunes", "CO", "PMO", 37.73, -105.51],
+  ["NP-GRSM", "Great Smoky Mountains", "NC, TN", "PEA", 35.68, -83.53],
+  ["NP-GUMO", "Guadalupe Mountains", "TX", "PSO", 31.92, -104.87],
+  ["NP-HALE", "Haleakalā", "HI", "PPA", 20.72, -156.17],
+  ["NP-HAVO", "Hawaiʻi Volcanoes", "HI", "PPA", 19.38, -155.2],
+  ["NP-HOSP", "Hot Springs", "AR", "PSO", 34.51, -93.05],
+  ["NP-INDU", "Indiana Dunes", "IN", "PMW", 41.65, -87.05],
+  ["NP-ISRO", "Isle Royale", "MI", "PMW", 48.1, -88.55],
+  ["NP-JOTR", "Joshua Tree", "CA", "PPA", 33.79, -115.9],
+  ["NP-KATM", "Katmai", "AK", "PAK", 58.5, -155.0],
+  ["NP-KEFJ", "Kenai Fjords", "AK", "PAK", 59.92, -149.65],
+  ["NP-KICA", "Kings Canyon", "CA", "PPA", 36.8, -118.55],
+  ["NP-KOVA", "Kobuk Valley", "AK", "PAK", 67.55, -159.28],
+  ["NP-LACL", "Lake Clark", "AK", "PAK", 60.97, -153.42],
+  ["NP-LAVO", "Lassen Volcanic", "CA", "PPA", 40.49, -121.51],
+  ["NP-MACA", "Mammoth Cave", "KY", "PEA", 37.18, -86.1],
+  ["NP-MEVE", "Mesa Verde", "CO", "PMO", 37.18, -108.49],
+  ["NP-MORA", "Mount Rainier", "WA", "PPA", 46.85, -121.75],
+  ["NP-NERI", "New River Gorge", "WV", "PEA", 38.07, -81.08],
+  ["NP-NOCA", "North Cascades", "WA", "PPA", 48.7, -121.2],
+  ["NP-OLYM", "Olympic", "WA", "PPA", 47.97, -123.5],
+  ["NP-PEFO", "Petrified Forest", "AZ", "PMO", 35.07, -109.78],
+  ["NP-PINN", "Pinnacles", "CA", "PPA", 36.48, -121.16],
+  ["NP-REDW", "Redwood", "CA", "PPA", 41.3, -124.0],
+  ["NP-ROMO", "Rocky Mountain", "CO", "PMO", 40.4, -105.58],
+  ["NP-SAGU", "Saguaro", "AZ", "PMO", 32.25, -110.5],
+  ["NP-SEQU", "Sequoia", "CA", "PPA", 36.43, -118.68],
+  ["NP-SHEN", "Shenandoah", "VA", "PEA", 38.53, -78.35],
+  ["NP-THRO", "Theodore Roosevelt", "ND", "PMW", 46.97, -103.45],
+  ["NP-VIIS", "Virgin Islands", "VI", "PTR", 18.33, -64.73],
+  ["NP-VOYA", "Voyageurs", "MN", "PMW", 48.5, -92.88],
+  ["NP-WHSA", "White Sands", "NM", "PMO", 32.78, -106.17],
+  ["NP-WICA", "Wind Cave", "SD", "PMW", 43.57, -103.48],
+  ["NP-WRST", "Wrangell–St. Elias", "AK", "PAK", 61.0, -142.0],
+  ["NP-YELL", "Yellowstone", "WY, MT, ID", "PMO", 44.6, -110.5],
+  ["NP-YOSE", "Yosemite", "CA", "PPA", 37.83, -119.5],
+  ["NP-ZION", "Zion", "UT", "PMO", 37.3, -113.05]
+];
+const PARK_REGIONS = { PAK: ["Alaska"], PEA: ["East"], PMW: ["Midwest"], PMO: ["Mountain"], PPA: ["Pacific"], PSO: ["South"], PTR: ["Territories"] };
+const PARK_REGION_AZ = ["PAK", "PEA", "PMW", "PMO", "PPA", "PSO", "PTR"];
+const isParkCode = c => /^NP-[A-Z]{4}$/.test(c);
+const PARK_INFO = {};
+NATIONAL_PARKS.forEach(([code, name, states, region, lat, lon]) => { contOf[code] = region; PARK_INFO[code] = { name, states, lat, lon }; });
+const parkFullName = code => code === "NP-NPSA" ? "National Park of American Samoa" : `${PARK_INFO[code].name} National Park`;
 const STATE_EXCLUDE = new Set(["US-DC"]);   // owner's choice: Washington, D.C. is shown but not counted
 const TERRITORY_POS = { PR: [-66.5, 18.2], VI: [-64.8, 18.3], GU: [144.8, 13.4], MP: [145.7, 15.2], AS: [-170.7, -14.3] };
 // Flag image key: states use flagcdn's "us-ca" style; territories have their own country-style flags.
@@ -537,13 +616,25 @@ let countries = [];          // [{code, name, d}] every shape on the map, territ
 let listCountries = [];      // sovereign countries only: what you check off and count
 let stateList = [];          // US states and territories (the States map)
 let currentList = [];        // whichever list the Countries | States switcher shows
-let view = "countries";      // "countries" or "states"
+let view = "countries";      // "countries", "states" or "parks"
 let viewChosen = false;      // true once the person picks a map this visit (then the Profile default doesn't override it)
-const groupKeys = () => view === "states" ? REGION_AZ : CONT_AZ;
-const groupName = k => (CONTINENTS[k] || STATE_REGIONS[k] || ["Other"])[0];
-const NOUN = () => view === "states"
-  ? { many: "states", one: "state", group: "regions", groupOne: "region", where: "the US", title: "States" }
-  : { many: "countries", one: "country", group: "continents", groupOne: "continent", where: "the world", title: "Countries" };
+let parkList = [];           // the 64 national parks (the Parks map)
+// Each map's settings. Adding a map means adding an entry here (plus its data, table and SQL).
+const VIEW_CFG = {
+  countries: { noun: { many: "countries", one: "country", group: "continents", groupOne: "continent", where: "the world", title: "Countries" },
+    groups: CONT_AZ, list: () => listCountries, rankRpc: "my_travel_stats", boardRpc: "leaderboard", boardGroup: "continent", sql: "leaderboard.sql" },
+  states: { noun: { many: "states", one: "state", group: "regions", groupOne: "region", where: "the US", title: "States" },
+    groups: REGION_AZ, list: () => stateList, rankRpc: "my_state_stats", boardRpc: "state_leaderboard", boardGroup: "region", sql: "add-states.sql and add-state-leaderboards.sql",
+    table: "state_visits", col: "state_code", flag: "noStates" },
+  parks: { noun: { many: "national parks", one: "park", group: "regions", groupOne: "region", where: "all national parks", title: "National parks" },
+    groups: PARK_REGION_AZ, list: () => parkList, rankRpc: "my_park_stats", boardRpc: "park_leaderboard", boardGroup: "region", sql: "add-parks.sql",
+    table: "park_visits", col: "park_code", flag: "noParks" }
+};
+const VCFG = () => VIEW_CFG[view];
+const groupKeys = () => VCFG().groups;
+const groupName = k => (CONTINENTS[k] || STATE_REGIONS[k] || PARK_REGIONS[k] || ["Other"])[0];
+const NOUN = () => VCFG().noun;
+const viewOfCode = code => isParkCode(code) ? "parks" : isStateCode(code) ? "states" : "countries";
 const byCode = {};
 
 /* Territories light up with the country they belong to. */
@@ -616,15 +707,17 @@ function persist(code, immediate) {
   P.timers.set(code, setTimeout(() => { P.timers.delete(code); flush(code); }, immediate ? 0 : 700));
   setStatus("busy", "Saving…");
 }
-async function upsertState(code, r) {
-  const row = { user_id: session.user.id, state_code: code, visited: r.visited, trips: r.trips, notes: r.notes,
+// States and parks each have their own table (countries use "visits").
+async function upsertPlace(code, r) {
+  const c = VIEW_CFG[viewOfCode(code)];
+  const row = { user_id: session.user.id, [c.col]: code, visited: r.visited, trips: r.trips, notes: r.notes,
     first_year: r.firstYear || null, updated_at: new Date().toISOString() };
-  const res = await sb.from("state_visits").upsert(row, { onConflict: "user_id,state_code" });
-  if (res.error && /state_visits|relation|schema cache/i.test(res.error.message || "")) P.noStates = true;
+  const res = await sb.from(c.table).upsert(row, { onConflict: "user_id," + c.col });
+  if (res.error && /relation|schema cache|does not exist/i.test(res.error.message || "")) P[c.flag] = true;
   return res;
 }
 async function upsertVisit(code, r) {
-  if (isStateCode(code)) return upsertState(code, r);
+  if (viewOfCode(code) !== "countries") return upsertPlace(code, r);
   const row = { user_id: session.user.id, country_code: code, visited: r.visited,
     trips: r.trips, notes: r.notes, updated_at: new Date().toISOString() };
   if (!P.noYearColumn) row.first_year = r.firstYear || null;
@@ -644,7 +737,9 @@ async function flush(code, retried) {
   let retry = false;
   try {
     const res = (!r || isEmptyRec(r))
-      ? await (isStateCode(code) ? sb.from("state_visits").delete().eq("state_code", code) : sb.from("visits").delete().eq("country_code", code))
+      ? await (viewOfCode(code) !== "countries"
+          ? sb.from(VIEW_CFG[viewOfCode(code)].table).delete().eq(VIEW_CFG[viewOfCode(code)].col, code)
+          : sb.from("visits").delete().eq("country_code", code))
       : await upsertVisit(code, r);
     if (res.error) throw res.error;
     if (!P.timers.size && P.inflight.size === 1 && !P.dirty.size) { setStatus("ok", signedInText()); refreshRank(1500); }
@@ -665,9 +760,10 @@ function refreshRank(delay) {
   clearTimeout(rankTimer);
   rankTimer = setTimeout(async () => {
     if (!sb || !session) return;
-    const [c, st] = await Promise.all([sb.rpc("my_travel_stats"), sb.rpc("my_state_stats")]);
+    const [c, st, pk] = await Promise.all([sb.rpc("my_travel_stats"), sb.rpc("my_state_stats"), sb.rpc("my_park_stats")]);
     if (!c.error && c.data) rankInfo = c.data;
     if (!st.error && st.data) stateRankInfo = st.data;
+    if (!pk.error && pk.data) parkRankInfo = pk.data;
     renderSummary();
   }, delay || 0);
 }
@@ -682,9 +778,12 @@ async function loadRecords() {
   if (error) { setStatus("warn", "Couldn't load your countries. Refresh to try again."); return; }
   records = {};
   (data || []).forEach(row => { records[row.country_code] = sanitize(row); });
-  const st = await sb.from("state_visits").select("state_code,visited,trips,notes,first_year");
-  if (st.error) P.noStates = true;
-  else { P.noStates = false; (st.data || []).forEach(row => { records[row.state_code] = sanitize(row); }); }
+  for (const k of ["states", "parks"]) {
+    const c = VIEW_CFG[k];
+    const res = await sb.from(c.table).select(`${c.col},visited,trips,notes,first_year`);
+    if (res.error) P[c.flag] = true;
+    else { P[c.flag] = false; (res.data || []).forEach(row => { records[row[c.col]] = sanitize(row); }); }
+  }
   P.mode = "cloud";
   migrateTerritories();
   setStatus("ok", signedInText());
@@ -778,7 +877,7 @@ async function loadBoard(force) {
   const hit = boardCache[key];
   if (!force && hit && Date.now() - hit.at < 60000) return;
   boardCache[key] = { at: Date.now(), rows: hit ? hit.rows : null, loading: true };
-  const fn = v === "states" ? "state_leaderboard" : "leaderboard";
+  const fn = VIEW_CFG[v].boardRpc;
   const { data, error } = await sb.rpc(fn, { ...boardArgs(mode), max_rows: 50 });
   boardCache[key] = { at: Date.now(), rows: error ? null : (data || []), error: error ? (error.message || "error") : null };
   if (tab === "board" && boardMode === mode && view === v) renderBoard();
@@ -789,9 +888,9 @@ function renderBoard() {
   ul.replaceChildren();
   const yr = new Date().getFullYear();
   const sel = el("select", { id: "boardSel", "aria-label": "Choose a leaderboard" });
-  const N = NOUN(), states = view === "states";
+  const N = NOUN(), cfg = VCFG();
   const opts = [["all", `Most ${N.many} · all travelers`], ["year", `Most ${N.many} visited in ${yr}`]];
-  if (states) REGION_AZ.map(k => STATE_REGIONS[k][0]).forEach(n => opts.push(["region:" + n, `Most of the ${n}`]));
+  if (cfg.boardGroup === "region") groupKeys().map(groupName).forEach(n => opts.push(["region:" + n, `Most in ${n}`]));
   else CONT_AZ.map(k => CONTINENTS[k][0]).forEach(n => opts.push(["continent:" + n, `Most of ${n}`]));
   if (myProfile && myProfile.home_country) opts.push(["home", `From ${myProfile.home_country_name || myProfile.home_country}`]);
   if (myProfile && myProfile.home_country && myProfile.home_state) opts.push(["state", `From ${myProfile.home_state}`]);
@@ -814,10 +913,10 @@ function renderBoard() {
   }
   const c = boardCache[view + ":" + boardMode];
   if (!c || c.loading && !c.rows) { ul.append(el("li", { class: "board-note", style: "display:block", text: "Loading…" })); return; }
-  if (c.error) { ul.append(el("li", { class: "board-note", style: "display:block", text: `Couldn't load this leaderboard. If you haven't yet, run ${states ? "add-state-leaderboards.sql" : "leaderboard.sql"} in Supabase.` })); return; }
+  if (c.error) { ul.append(el("li", { class: "board-note", style: "display:block", text: `Couldn't load this leaderboard. If you haven't yet, run ${cfg.sql} in Supabase.` })); return; }
   if (!c.rows.length) { ul.append(el("li", { class: "board-note", style: "display:block", text: "Nobody on this board yet. Be the first!" })); return; }
   const unit = boardMode === "year" ? `in ${yr}` : boardMode.startsWith("continent:") ? `in ${boardMode.slice(10)}`
-    : boardMode.startsWith("region:") ? `in the ${boardMode.slice(7)}` : N.many;
+    : boardMode.startsWith("region:") ? `in ${boardMode.slice(7)}` : N.many;
   const lb = el("ol", { class: "lb" });
   c.rows.forEach(r => {
     lb.append(el("li", { class: r.is_me ? "me" : "" },
@@ -877,7 +976,7 @@ function ensureHomeVisited() {
 function defaultViewPref() {
   const meta = (session && session.user.user_metadata) || {};
   const v = (myProfile && myProfile.default_view) || meta.default_view;
-  return v === "states" ? "states" : "countries";
+  return VIEW_CFG[v] ? v : "countries";
 }
 
 
@@ -907,7 +1006,7 @@ function openHelp() {
         P_("Where I've Been is a personal travel map. Mark the countries you've visited, keep notes on your trips, earn badges, and, if you like, compare your travels with other people in the traveler community.")),
       sec("How to use it",
         UL([
-          "Countries or States: switch maps with the Countries | States buttons at the top of the panel. States covers the 50 US states. Choose which one the app opens on in Profile.",
+          "Countries, States or Parks: switch maps with the Countries | States | Parks buttons at the top of the panel. States covers the 50 US states; Parks covers the 64 US national parks (not monuments or historic sites). Choose which one the app opens on in Profile.",
           "Mark a country: open Check off countries, open a continent and tap the country. Tap again to undo. On a computer you can also double-click a country on the map. States work the same way, grouped by region.",
           "Open a country's page: click it on the map, or click its name in the Visited tab. You'll see a photo, the flag and key facts.",
           "Year first visited: type the year on a country's page. It feeds your \"traveling since\" year, countries this year and the Big year badge.",
@@ -1083,7 +1182,7 @@ $("signOutBtn").onclick = async () => { await sb.auth.signOut(); };
 
 function openProfile() {
   const dvSel = el("select", { id: "profileView", class: "select" },
-    el("option", { value: "countries" }, "Countries"), el("option", { value: "states" }, "States"));
+    el("option", { value: "countries" }, "Countries"), el("option", { value: "states" }, "States"), el("option", { value: "parks" }, "National parks"));
   dvSel.value = defaultViewPref();
   if (!session) return;
   selected = null; paintMap();
@@ -1228,7 +1327,7 @@ function handleSession(s, event) {
     linkErrorMsg = "";
     if (prev !== s.user.id) { setTimeout(loadRecords, 0); checkAdmin(); }
   } else {
-    records = {}; selected = null; rankInfo = null; stateRankInfo = null; earnedBefore = null; myProfile = null; Object.keys(boardCache).forEach(k => delete boardCache[k]); P.mode = "signedout";
+    records = {}; selected = null; rankInfo = null; stateRankInfo = null; parkRankInfo = null; earnedBefore = null; myProfile = null; Object.keys(boardCache).forEach(k => delete boardCache[k]); P.mode = "signedout";
     setStatus(null, "Not signed in");
     setAuthMode(authMode === "reset" ? "signin" : authMode);
     if (linkErrorMsg) authMsg(linkErrorMsg, true);
@@ -1532,7 +1631,8 @@ async function loadStateGeometry() {
         const d = path(f);
         return code && d ? { code, name: STATE_NAMES[code.slice(3)] || f.properties.name, d } : null;
       }).filter(Boolean);
-      if (list.length > 40) return { W: 975, H: 610, list };
+      // us-atlas lays its outlines out with this projection, so park locations line up with them.
+      if (list.length > 40) return { W: 975, H: 610, list, proj: d3.geoAlbersUsa().scale(1300).translate([487.5, 305]) };
     }
   } catch {}
   // 1. amCharts US outlines (longitude/latitude), drawn with d3's Albers USA projection (Alaska and Hawaii inset).
@@ -1553,7 +1653,7 @@ async function loadStateGeometry() {
         const d = path(f);
         return d && isStateCode(code) ? { code, name: STATE_NAMES[code.slice(3)] || (f.properties && f.properties.name) || code, d } : null;
       }).filter(Boolean);
-      if (list.length > 40) return { W, H, list };
+      if (list.length > 40) return { W, H, list, proj };
     }
   } catch {}
   // 2. jsVectorMap US maps (already projected), if amCharts isn't available.
@@ -1629,16 +1729,16 @@ function stateListFromNames() {
 }
 
 function switchView(v) {
-  view = v === "states" ? "states" : "countries";
-  currentList = view === "states" ? stateList : listCountries;
-  if (MAPS.countries) MAPS.countries.svg.style("display", view === "countries" ? null : "none");
-  if (MAPS.states) MAPS.states.svg.style("display", view === "states" ? null : "none");
+  view = VIEW_CFG[v] ? v : "countries";
+  currentList = VCFG().list();
+  for (const k of Object.keys(MAPS)) MAPS[k].svg.style("display", k === view ? null : "none");
   const m = MAPS[view];
   if (m) ({ svg, gRoot, paths, zoom, mapW, mapH } = m);
   const msg = $("stateMsg");
-  msg.hidden = !(view === "states" && !MAPS.states);
+  msg.hidden = view === "countries" || !!MAPS[view];
   $("vCountries").setAttribute("aria-selected", String(view === "countries"));
   $("vStates").setAttribute("aria-selected", String(view === "states"));
+  $("vParks").setAttribute("aria-selected", String(view === "parks"));
   const N = NOUN();
   $("tabAll").textContent = `Check off ${N.many}`;
   $("search").placeholder = `Search ${N.many}`;
@@ -1653,6 +1753,7 @@ function switchView(v) {
 }
 $("vCountries").addEventListener("click", () => { viewChosen = true; if (view !== "countries") switchView("countries"); });
 $("vStates").addEventListener("click", () => { viewChosen = true; if (view !== "states") switchView("states"); });
+$("vParks").addEventListener("click", () => { viewChosen = true; if (view !== "parks") switchView("parks"); });
 
 /* A simple page for a state or territory: flag, name, region and a short description. */
 const STATE_WIKI = { "US-GA": "Georgia (U.S. state)", "US-WA": "Washington (state)", "US-NY": "New York (state)", "US-VI": "United States Virgin Islands" };
@@ -1686,9 +1787,84 @@ function statePage(code) {
   return node;
 }
 
+/* ---------- Parks map: the US outline with a dot per national park ---------- */
+function parkListFromData() {
+  parkList = NATIONAL_PARKS.map(([code]) => ({ code, name: PARK_INFO[code].name })).sort((a, b) => a.name.localeCompare(b.name));
+  parkList.forEach(c => byCode[c.code] = byCode[c.code] || c);
+}
+const dotPath = (x, y, r) => `M${(x - r).toFixed(1)},${y.toFixed(1)}a${r},${r} 0 1,0 ${2 * r},0a${r},${r} 0 1,0 ${-2 * r},0Z`;
+function drawParkMap(sg) {
+  if (!sg || !sg.proj) return;
+  const W = sg.W, base = sg.list.filter(c => c.d && !c.dot), r = 5.5;
+  const placed = [], away = [];
+  parkList.forEach(c => {
+    const i = PARK_INFO[c.code], p = sg.proj([i.lon, i.lat]);
+    if (p && isFinite(p[0]) && isFinite(p[1])) placed.push({ ...c, x: p[0], y: p[1] }); else away.push(c);
+  });
+  // Parks outside the map's projection (American Samoa, Virgin Islands) sit in a labelled row underneath.
+  let H = sg.H; const labels = [];
+  if (away.length) {
+    const top = H + 16, step = 170, x0 = W / 2 - step * (away.length - 1) / 2;
+    away.forEach((c, k) => { placed.push({ ...c, x: x0 + k * step, y: top }); labels.push({ x: x0 + k * step, y: top + r + 14, text: c.name }); });
+    H = top + r + 26;
+  }
+  placed.forEach(c => { c.d = dotPath(c.x, c.y, r); c.dot = true; byCode[c.code] = c; });
+  parkList = placed.sort((a, b) => a.name.localeCompare(b.name));
+  const s = d3.select("#map").append("svg").attr("viewBox", `0 0 ${W} ${H}`).attr("preserveAspectRatio", "xMidYMid meet")
+    .style("display", view === "parks" ? null : "none");
+  const g = s.append("g");
+  g.append("g").selectAll("path").data(base).join("path").attr("class", "inert").attr("d", d => d.d);
+  g.append("g").selectAll("path").data(parkList, d => d.code).join("path")
+    .attr("class", d => "country dot park cont-" + contOf[d.code]).attr("d", d => d.d);
+  g.append("g").selectAll("text").data(labels).join("text").attr("class", "map-label")
+    .attr("x", d => d.x).attr("y", d => d.y).attr("text-anchor", "middle").text(d => d.text);
+  const tip = $("tip"), wrap = document.querySelector(".map-wrap");
+  const p = g.selectAll("path.country")
+    .on("mousemove", (e, d) => {
+      const rr = rec(d.code), box = wrap.getBoundingClientRect();
+      tip.replaceChildren(parkFullName(d.code), el("small", { text: `${PARK_INFO[d.code].states} · ${rr.visited ? "Visited" : "Not visited yet"}` }));
+      tip.style.left = (e.clientX - box.left) + "px"; tip.style.top = (e.clientY - box.top) + "px";
+      tip.classList.add("show");
+    })
+    .on("mouseleave", () => tip.classList.remove("show"))
+    .on("click", (e, d) => { tip.classList.remove("show"); openDetail(d.code, false); })
+    .on("dblclick", (e, d) => { e.preventDefault(); if (canEdit()) setVisited(d.code, !isVisited(d.code)); });
+  const z = d3.zoom().scaleExtent([1, 16]).translateExtent([[0, 0], [W, H]]).on("zoom", e => g.attr("transform", e.transform));
+  s.call(z).on("dblclick.zoom", null);
+  MAPS.parks = { svg: s, gRoot: g, paths: p, zoom: z, mapW: W, mapH: H };
+}
+
+const PARK_WIKI = { "NP-NPSA": "National Park of American Samoa", "NP-WRST": "Wrangell–St. Elias National Park and Preserve" };
+let parkPageCache = { code: null, node: null };
+function parkPage(code) {
+  if (parkPageCache.code === code && parkPageCache.node) return parkPageCache.node;
+  const info = PARK_INFO[code], k = contOf[code] || "XX";
+  const photo = el("img", { class: "hero-photo", alt: "" });
+  photo.addEventListener("load", () => photo.classList.add("ready"));
+  photo.addEventListener("error", () => photo.remove());
+  const credit = el("span", { class: "hero-credit" });
+  const hero = el("div", { class: "hero cont-" + k }, photo,
+    el("div", { class: "hero-title" }, el("span", { class: "flag-emoji", "aria-hidden": "true", text: "🏞️" }),
+      el("h2", { text: parkFullName(code) }), el("span", { class: "sub", text: `${info.states} · ${groupName(k)}` })), credit);
+  const about = el("p", { class: "about" });
+  const src = el("p", { class: "hint src" });
+  const node = el("div", { class: "country-page" }, hero, about, src);
+  parkPageCache = { code, node };
+  wikiSummary(PARK_WIKI[code] || parkFullName(code)).then(C => {
+    if (C && C.extract && C.type !== "disambiguation") {
+      const sentences = C.extract.match(/[^.!?]+[.!?]+(\s|$)/g) || [C.extract];
+      about.replaceChildren(sentences.slice(0, 3).join("").trim() + " ",
+        C.url ? el("a", { href: C.url, target: "_blank", rel: "noopener", text: "Read more on Wikipedia" }) : "");
+      if (looksLikePhoto(C.thumb)) { photo.src = bigThumb(C.thumb); credit.textContent = `${C.title} · Wikipedia`; }
+      src.textContent = "Photo and description: Wikipedia.";
+    }
+  }).catch(() => {});
+  return node;
+}
+
 /* ---------- Stat tiles ---------- */
 let rankInfo = null;
-let stateRankInfo = null;   // the same, for the States map   // {travelers, my_count, rank, average, top} from the database, when available
+let stateRankInfo = null, parkRankInfo = null;   // the same, for the States map   // {travelers, my_count, rank, average, top} from the database, when available
 function tripDays(t) {
   if (!isDate(t.from) || !isDate(t.to)) return 0;
   const d = Math.round((Date.parse(t.to) - Date.parse(t.from)) / 86400000) + 1;
@@ -1704,7 +1880,7 @@ function renderTiles(visited) {
   const thisYear = visited.filter(c => { const r = rec(c.code); return String(r.firstYear) === yr || r.trips.some(t => (t.from || t.to).startsWith(yr)); }).length;
   const tile = (big, small, cls, title) => el("div", { class: "tile" + (cls ? " " + cls : ""), title }, el("b", { text: String(big) }), el("span", { text: small }));
   const out = [];
-  const ri = view === "states" ? stateRankInfo : rankInfo;
+  const ri = { countries: rankInfo, states: stateRankInfo, parks: parkRankInfo }[view];
   if (ri && ri.travelers) {
     out.push(ri.rank && visited.length
       ? tile("#" + ri.rank, `of ${ri.travelers} traveler${ri.travelers === 1 ? "" : "s"}` +
@@ -1845,8 +2021,8 @@ function renderSummary() {
   renderMeLine(years.length ? years[0].slice(0, 4) : "");
   renderTiles(visited);
   renderBadgeRow();
-  $("badgeRow").hidden = view === "states";            // state badges come in a later release
-  $("shareBtn").hidden = !session || view === "states"; // Share my map shows countries
+  $("badgeRow").hidden = view !== "countries";            // badges for states and parks come later
+  $("shareBtn").hidden = !session || view !== "countries"; // Share my map shows countries
 
   const ul = $("conts"); ul.replaceChildren();
   for (const k of groupKeys()) {
@@ -1878,7 +2054,7 @@ function renderList() {
     return;
   }
   if (tab === "all") {
-    if (view === "states" && P.noStates && session) ul.append(el("li", { class: "board-note", style: "display:block", text: "States can't be saved yet: the site owner needs to run add-states.sql in Supabase." }));
+    if (VCFG().flag && P[VCFG().flag] && session) ul.append(el("li", { class: "board-note", style: "display:block", text: `${NOUN().title} can't be saved yet: the site owner needs to run ${VCFG().sql} in Supabase.` }));
     renderChips(ul, items, q); ul.scrollTop = keepScroll; return;
   }
   for (const c of items) {
@@ -1899,8 +2075,10 @@ const openConts = new Set();
 const CONT_ORDER = CONT_AZ;
 function chip(c) {
   const on = isVisited(c.code);
-  const flag = el("img", { class: "cf", alt: "", loading: "lazy", src: flagSrc(c.code, 40) });
-  flag.addEventListener("error", () => flag.replaceWith(el("span", { class: "cf fe", "aria-hidden": "true", text: flagEmoji(c.code) })));
+  const flag = isParkCode(c.code)
+    ? el("span", { class: "cf fe", "aria-hidden": "true", text: "🏞️" })
+    : el("img", { class: "cf", alt: "", loading: "lazy", src: flagSrc(c.code, 40) });
+  if (!isParkCode(c.code)) flag.addEventListener("error", () => flag.replaceWith(el("span", { class: "cf fe", "aria-hidden": "true", text: flagEmoji(c.code) })));
   return el("button", { type: "button", class: "chip cont-" + (contOf[c.code] || "XX") + (on ? " on" : ""),
     "aria-pressed": String(on), disabled: !canEdit(), title: on ? `${c.name}: visited (tap to undo)` : `Mark ${c.name} as visited`,
     onclick: () => setVisited(c.code, !isVisited(c.code)) },
@@ -2128,7 +2306,7 @@ function renderDetail() {
 
   box.replaceChildren(
     el("button", { type: "button", class: "back", onclick: closeDetail }, "← All countries"),
-    (isStateCode(code) ? statePage(code) : countryPage(code)),
+    (isParkCode(code) ? parkPage(code) : isStateCode(code) ? statePage(code) : countryPage(code)),
     el("button", { type: "button", class: "visit-btn" + (r.visited ? " on" : ""), disabled: ro, "aria-pressed": String(r.visited),
       onclick: () => setVisited(code, !r.visited) }, r.visited ? "✓ Visited" : "Mark as visited"),
     el("section", { class: "sec" },
@@ -2445,6 +2623,15 @@ function matchState(raw) {
   const starts = stateList.filter(c => c.name.toLowerCase().startsWith(n));
   return n.length >= 3 && starts.length === 1 ? starts[0].code : null;
 }
+function matchPark(raw) {
+  const norm = x => String(x || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[ʻ'’.]/g, "").replace(/[–—-]/g, " ").replace(/\s+/g, " ").trim();
+  const n = norm(raw).replace(/national park( and preserve)?|\bnp\b|^the /g, "").replace(/\s+/g, " ").trim();
+  if (!n) return null;
+  const exact = parkList.find(c => norm(c.name) === n);
+  if (exact) return exact.code;
+  const starts = parkList.filter(c => norm(c.name).startsWith(n));
+  return n.length >= 3 && starts.length === 1 ? starts[0].code : null;
+}
 function matchCountry(raw) {
   const n = norm(raw);
   if (!n) return null;
@@ -2473,8 +2660,8 @@ function openImport() {
     if (!parts.length) { toast("Paste some country names first"); return; }
     const found = new Set(), missed = [];
     for (const p of parts) {
-      const code = view === "states" ? matchState(p) : matchCountry(p);
-      if (code) found.add(view === "states" ? code : eff(code)); else missed.push(p);
+      const code = view === "states" ? matchState(p) : view === "parks" ? matchPark(p) : matchCountry(p);
+      if (code) found.add(view === "countries" ? eff(code) : code); else missed.push(p);
     }
     const fresh = [...found].filter(c => !isVisited(c));
     go.disabled = true; go.textContent = `Saving ${fresh.length}…`;
@@ -2543,11 +2730,12 @@ document.addEventListener("keydown", e => { if (e.key === "Escape" && selected) 
   addSmall(geo);
   drawMap(geo);
   stateListFromNames();          // the checklist works even before (or without) the States outlines
+  parkListFromData();
   renderAll();
   loadStateGeometry().then(sg => {
-    if (sg) { addStateDots(sg); drawStateMap(sg); }
-    else $("stateMsg").textContent = "The States map couldn't load. You can still check off states in the list.";
-    if (view === "states") switchView("states"); else renderAll();
+    if (sg) { drawParkMap(sg); addStateDots(sg); drawStateMap(sg); }
+    if (!MAPS.states || !MAPS.parks) $("stateMsg").textContent = "This map couldn't load. You can still check places off in the list.";
+    if (view !== "countries") switchView(view); else renderAll();
   }).catch(() => {});
   initAuth().then(() => { if (location.hash === "#help") openHelp(); });
 })();
