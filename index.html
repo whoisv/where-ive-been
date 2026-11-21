@@ -369,7 +369,7 @@ details.more .more-body { display: grid; gap: 18px; padding: 4px 12px 14px; }
       <div class="viewsw" role="tablist" aria-label="Choose a map">
         <button type="button" role="tab" id="vCountries" aria-selected="true">Countries</button>
         <button type="button" role="tab" id="vStates" aria-selected="false">States</button>
-        <button type="button" role="tab" id="vParks" aria-selected="false">Parks</button>
+        <button type="button" role="tab" id="vParks" aria-selected="false">National Parks</button>
       </div>
       <div class="me-line" id="meLine" hidden></div>
       <div class="big"><strong id="count">0</strong><span id="countLabel">countries visited</span><button type="button" class="share-btn" id="shareBtn" hidden>Share my map</button></div>
@@ -457,7 +457,7 @@ details.more .more-body { display: grid; gap: 18px; padding: 4px 12px 14px; }
 "use strict";
 
 /* Bump on every change so it's easy to see which version is live. */
-const APP_VERSION = "v1.21 · Nov 20, 2026";
+const APP_VERSION = "v1.22 · Nov 20, 2026 · preview";
 
 /* ---------- Reference data ---------- */
 const CONTINENTS = {
@@ -626,7 +626,7 @@ const VIEW_CFG = {
   states: { noun: { many: "states", one: "state", group: "regions", groupOne: "region", where: "the US", title: "States" },
     groups: REGION_AZ, list: () => stateList, rankRpc: "my_state_stats", boardRpc: "state_leaderboard", boardGroup: "region", sql: "add-states.sql and add-state-leaderboards.sql",
     table: "state_visits", col: "state_code", flag: "noStates" },
-  parks: { noun: { many: "national parks", one: "park", group: "regions", groupOne: "region", where: "all national parks", title: "National parks" },
+  parks: { noun: { many: "national parks", one: "park", group: "regions", groupOne: "region", where: "all national parks", title: "National Parks" },
     groups: PARK_REGION_AZ, list: () => parkList, rankRpc: "my_park_stats", boardRpc: "park_leaderboard", boardGroup: "region", sql: "add-parks.sql",
     table: "park_visits", col: "park_code", flag: "noParks" }
 };
@@ -1006,7 +1006,7 @@ function openHelp() {
         P_("Where I've Been is a personal travel map. Mark the countries you've visited, keep notes on your trips, earn badges, and, if you like, compare your travels with other people in the traveler community.")),
       sec("How to use it",
         UL([
-          "Countries, States or Parks: switch maps with the Countries | States | Parks buttons at the top of the panel. States covers the 50 US states; Parks covers the 64 US national parks (not monuments or historic sites). Choose which one the app opens on in Profile.",
+          "Countries, States or National Parks: switch maps with the Countries | States | National Parks buttons at the top of the panel. States covers the 50 US states; National Parks covers the 64 US national parks (not monuments or historic sites). Choose which one the app opens on in Profile.",
           "Mark a country: open Check off countries, open a continent and tap the country. Tap again to undo. On a computer you can also double-click a country on the map. States work the same way, grouped by region.",
           "Open a country's page: click it on the map, or click its name in the Visited tab. You'll see a photo, the flag and key facts.",
           "Year first visited: type the year on a country's page. It feeds your \"traveling since\" year, countries this year and the Big year badge.",
@@ -1182,7 +1182,7 @@ $("signOutBtn").onclick = async () => { await sb.auth.signOut(); };
 
 function openProfile() {
   const dvSel = el("select", { id: "profileView", class: "select" },
-    el("option", { value: "countries" }, "Countries"), el("option", { value: "states" }, "States"), el("option", { value: "parks" }, "National parks"));
+    el("option", { value: "countries" }, "Countries"), el("option", { value: "states" }, "States"), el("option", { value: "parks" }, "National Parks"));
   dvSel.value = defaultViewPref();
   if (!session) return;
   selected = null; paintMap();

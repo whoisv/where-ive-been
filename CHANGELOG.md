@@ -3,7 +3,7 @@
 Releases of Where I've Been. Each release is one production deploy; the version shows in the map's bottom-right corner.
 
 ## Pending release (on `preview`, not yet live)
-- Nothing yet.
+- v1.22: The third map is called "National Parks" (switcher, Profile and Help), not "Parks".
 
 ## v1.21 · Nov 20, 2026 (live)
 Includes v1.19 and v1.20.
