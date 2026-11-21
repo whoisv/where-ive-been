@@ -5,7 +5,7 @@ Releases of Where I've Been. Each release is one production deploy; the version 
 ## Pending release (on `preview`, not yet live)
 - v1.22: The third map is called "National Parks" (switcher, Profile and Help), not "Parks".
 - v1.22 preview 2: Photos. Up to 10 per place (country, state or national park), added from the place's page. Shrunk on your device before upload (about 1600 px, usually 150–400 KB, plus a small thumbnail). Your first photo becomes the page's banner. Click to view full size, add a caption, step through, or delete. Private by default; Profile has "Share my photos with the traveler community" (needs community membership), and shared photos appear to other members under "From other travelers" with the screen name. Deleting your account deletes your photos. Requires add-photos.sql.
-- v1.22 preview 3: The photo viewer fills the screen (full screen on phones).
+- v1.22 preview 3–4: The photo viewer is a larger, fixed-size window (up to 900 × 700) so photos stay sharp; full screen on phones.
 
 ## v1.21 · Nov 20, 2026 (live)
 Includes v1.19 and v1.20.
