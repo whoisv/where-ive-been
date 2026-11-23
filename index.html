@@ -139,6 +139,24 @@ button, input, textarea { font: inherit; color: inherit; }
 .photo-meta input { flex: 1; min-width: 0; }
 .ph-nav { width: 36px; height: 36px; border-radius: 50%; border: 0; background: var(--bg); font-size: 22px; line-height: 1; cursor: pointer; color: var(--ink); }
 .ph-del { border: 1px solid var(--danger); color: var(--danger); background: transparent; border-radius: 8px; padding: 6px 10px; cursor: pointer; white-space: nowrap; }
+.circle-card { border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; background: var(--surface); }
+.circle-card.personal { background: var(--bg); }
+.circle-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; cursor: pointer; font-size: 16px; }
+.personal .circle-head { cursor: default; }
+.circle-tag { font-size: 11.5px; padding: 2px 8px; border-radius: 999px; background: var(--bg); color: var(--muted); }
+.circle-tag.admin { background: var(--accent-soft, #e6edff); color: var(--accent); font-weight: 600; }
+.circle-body { display: grid; gap: 8px; margin-top: 10px; }
+.circle-body h3 { margin: 10px 0 0; font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+.together { margin: 0; font-size: 14.5px; }
+.circle-members { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.circle-members li { display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; align-items: center; padding: 8px 10px; border-radius: 10px; background: var(--bg); }
+.circle-members li.me { outline: 2px solid var(--accent); outline-offset: -2px; }
+.circle-members .who { display: flex; gap: 6px; align-items: baseline; flex-wrap: wrap; min-width: 0; }
+.circle-members .sc { font-variant-numeric: tabular-nums; font-size: 13.5px; }
+.circle-members .acts { grid-column: 1 / -1; display: flex; gap: 14px; }
+.linkbtn.danger { color: var(--danger); }
+.circle-body > .linkbtn { justify-self: start; }
+.circle-visitors { margin: 8px 0 0; font-size: 13.5px; }
 .share-dlg { border: 0; padding: 0; background: transparent; max-width: none; max-height: none; color: var(--ink); }
 .share-dlg::backdrop { background: rgba(10, 16, 24, .55); backdrop-filter: blur(2px); }
 .share-box { background: var(--surface); border-radius: 16px; box-shadow: 0 20px 60px rgba(0,0,0,.35); width: min(940px, calc(100vw - 48px)); max-height: calc(100vh - 48px); display: flex; flex-direction: column; overflow: hidden; }
@@ -393,7 +411,7 @@ details.more .more-body { display: grid; gap: 18px; padding: 4px 12px 14px; }
       <div class="tiles" id="tiles"></div>
       <ul class="conts" id="conts"></ul>
       <button type="button" class="badge-row" id="badgeRow" aria-label="See all badges"></button>
-      <div class="status" id="status"><span id="statusText"><i class="dot"></i>Connecting…</span><span style="display:flex;gap:12px;flex-wrap:wrap;justify-content:flex-end"><button type="button" class="linkbtn" id="importBtn">Import a list</button><button type="button" class="linkbtn" id="copyBtn">Copy my list</button><button type="button" class="linkbtn" id="profileBtn" hidden>Profile</button><a class="linkbtn" id="adminLink" href="admin.html" hidden>Admin</a><button type="button" class="linkbtn" id="signOutBtn" hidden>Sign out</button><button type="button" class="linkbtn" id="helpBtn">Help</button></span></div>
+      <div class="status" id="status"><span id="statusText"><i class="dot"></i>Connecting…</span><span style="display:flex;gap:12px;flex-wrap:wrap;justify-content:flex-end"><button type="button" class="linkbtn" id="importBtn">Import a list</button><button type="button" class="linkbtn" id="copyBtn">Copy my list</button><button type="button" class="linkbtn" id="circlesBtn" hidden>Circles</button><button type="button" class="linkbtn" id="profileBtn" hidden>Profile</button><a class="linkbtn" id="adminLink" href="admin.html" hidden>Admin</a><button type="button" class="linkbtn" id="signOutBtn" hidden>Sign out</button><button type="button" class="linkbtn" id="helpBtn">Help</button></span></div>
     </div>
 
     <div class="view" id="listView" hidden>
@@ -474,7 +492,7 @@ details.more .more-body { display: grid; gap: 18px; padding: 4px 12px 14px; }
 "use strict";
 
 /* Bump on every change so it's easy to see which version is live. */
-const APP_VERSION = "v1.22 · Nov 21, 2026";
+const APP_VERSION = "v1.23 · Nov 23, 2026 · preview";
 
 /* ---------- Reference data ---------- */
 const CONTINENTS = {
@@ -811,7 +829,9 @@ async function loadRecords() {
   if (!viewChosen) { const pref = defaultViewPref(); if (pref !== view) switchView(pref); }
   ensureHomeVisited();
   renderSummary();
+  await loadCircles();
   if (tab === "board") { loadBoard(true); renderList(); }
+  maybeJoinPending();
 }
 
 
@@ -895,7 +915,9 @@ async function loadBoard(force) {
   if (!force && hit && Date.now() - hit.at < 60000) return;
   boardCache[key] = { at: Date.now(), rows: hit ? hit.rows : null, loading: true };
   const fn = VIEW_CFG[v].boardRpc;
-  const { data, error } = await sb.rpc(fn, { ...boardArgs(mode), max_rows: 50 });
+  const { data, error } = mode.startsWith("circle:")
+    ? await sb.rpc("circle_board", { circle: mode.slice(7), kind: v })
+    : await sb.rpc(fn, { ...boardArgs(mode), max_rows: 50 });
   boardCache[key] = { at: Date.now(), rows: error ? null : (data || []), error: error ? (error.message || "error") : null };
   if (tab === "board" && boardMode === mode && view === v) renderBoard();
 }
@@ -911,8 +933,12 @@ function renderBoard() {
   else CONT_AZ.map(k => CONTINENTS[k][0]).forEach(n => opts.push(["continent:" + n, `Most of ${n}`]));
   if (myProfile && myProfile.home_country) opts.push(["home", `From ${myProfile.home_country_name || myProfile.home_country}`]);
   if (myProfile && myProfile.home_country && myProfile.home_state) opts.push(["state", `From ${myProfile.home_state}`]);
-  if (!opts.some(o => o[0] === boardMode)) boardMode = "all";
-  opts.forEach(([v, label]) => sel.append(el("option", { value: v, selected: v === boardMode }, label)));
+  const circleOpts = myCircles.map(c => ["circle:" + c.id, `${c.name} (circle)`]);
+  if (!opts.some(o => o[0] === boardMode) && !circleOpts.some(o => o[0] === boardMode)) boardMode = "all";
+  const optEl = ([v, label]) => el("option", { value: v, selected: v === boardMode }, label);
+  if (circleOpts.length) sel.append(el("optgroup", { label: "Your circles" }, ...circleOpts.map(optEl)), el("optgroup", { label: "Traveler community" }, ...opts.map(optEl)));
+  else opts.forEach(o => sel.append(optEl(o)));
+  const inCircle = boardMode.startsWith("circle:");
   sel.onchange = () => { boardMode = sel.value; loadBoard(false); renderBoard(); };
   if (!boardCache[view + ":" + boardMode]) loadBoard(false);
   const tools = el("li", { class: "board-tools", style: "display:grid;grid-template-columns:1fr" }, sel);
@@ -922,7 +948,7 @@ function renderBoard() {
     ul.append(el("li", { class: "board-note", style: "display:block", text: "Leaderboards aren't set up yet. Run leaderboard.sql in Supabase's SQL Editor, then refresh." }));
     return;
   }
-  if (!myProfile.is_public) {
+  if (!myProfile.is_public && !inCircle) {
     ul.append(el("li", { class: "board-note", style: "display:block" },
       "You haven't joined the traveler community, so you're not shown here. ",
       el("button", { type: "button", class: "linkbtn", onclick: openProfile }, "Join in Profile"),
@@ -932,7 +958,7 @@ function renderBoard() {
   if (!c || c.loading && !c.rows) { ul.append(el("li", { class: "board-note", style: "display:block", text: "Loading…" })); return; }
   if (c.error) { ul.append(el("li", { class: "board-note", style: "display:block", text: `Couldn't load this leaderboard. If you haven't yet, run ${cfg.sql} in Supabase.` })); return; }
   if (!c.rows.length) { ul.append(el("li", { class: "board-note", style: "display:block", text: "Nobody on this board yet. Be the first!" })); return; }
-  const unit = boardMode === "year" ? `in ${yr}` : boardMode.startsWith("continent:") ? `in ${boardMode.slice(10)}`
+  const unit = inCircle ? N.many : boardMode === "year" ? `in ${yr}` : boardMode.startsWith("continent:") ? `in ${boardMode.slice(10)}`
     : boardMode.startsWith("region:") ? `in ${boardMode.slice(7)}` : N.many;
   const lb = el("ol", { class: "lb" });
   c.rows.forEach(r => {
@@ -1037,6 +1063,15 @@ function openHelp() {
           "Join the traveler community (in Profile) to appear on leaderboards by your screen name, with your home and country counts.",
           "Others never see your email, your trips or your notes. You can leave the community at any time in Profile."
         ])),
+      sec("Circles",
+        UL([
+          "Personal is your own circle: everything you add starts there, private to you.",
+          "A circle is a private group you invite people to, such as family or friends. Click Circles next to Profile to start one; you'll be its admin and get an invite link to send by text or email.",
+          "Circle members see each other's screen name, home, counts and which places they've visited (\"From your circles\" on a place page), plus a circle leaderboard on the Leaderboard tab. Never email, trips or notes.",
+          "Photos: each member chooses whether to share their photos with each circle. Shared photos appear on a place's page under \"Shared with you\".",
+          "Admins can invite, rename the circle, make other members admins, remove members, make a new invite link (the old one stops working) and delete the circle. Not every member is an admin.",
+          "You can be in up to 10 circles, each with up to 50 people. You don't need to join the traveler community to be in a circle."
+        ])),
       sec("Common questions",
         Q("What counts as a country?",
           P_("The UN member states plus Vatican City and Taiwan, and a few places the app lists separately: Greenland, French Polynesia and French Guiana. Antarctica counts as its own continent. Disputed regions such as Kosovo, Northern Cyprus and Somaliland aren't listed.")),
@@ -1057,7 +1092,7 @@ function openHelp() {
       sec("Privacy",
         UL([
           "We store your email address (for signing in), the countries you mark, and any years, trips and notes you add. Your screen name and home location are stored only if you enter them.",
-          "Your map is private. Only if you join the traveler community do others see your screen name, home and country counts.",
+          "Your map is private. Only people in your circles, and the traveler community if you join it, see your screen name, home and counts.",
           "We don't sell your data or show ads. Signing in and data storage are handled by Supabase; sign-in emails are sent through Resend.",
           "Delete your account at any time from Profile. It permanently removes your login and everything you've saved."
         ])),
@@ -1326,6 +1361,7 @@ function openProfile() {
   input.focus();
 }
 $("profileBtn").onclick = openProfile;
+$("circlesBtn").onclick = () => openCircles();
 
 /* Admin link: only for accounts in the admins table (admin.sql). The admin page's data is
    protected in the database; this only decides whether to show the link. */
@@ -1341,6 +1377,8 @@ function handleSession(s, event) {
   session = s;
   $("signOutBtn").hidden = !s;
   $("profileBtn").hidden = !s;
+  $("circlesBtn").hidden = !s;
+  if (!s) myCircles = [];
   $("shareBtn").hidden = !s;
   if (!s) $("adminLink").hidden = true;
   if (s && prev === s.user.id && P.mode === "cloud" && !pendingCodes().size) setStatus("ok", signedInText());
@@ -2265,7 +2303,8 @@ async function loadPhotos(code, force) {
     return (photoCache[code] = { mine: [], others: [], at: Date.now(), err: mineQ.error.message || "error" });
   }
   photosNotSetUp = false;
-  const comm = await sb.rpc("community_photos", { place: code, max_rows: 24 });
+  let comm = await sb.rpc("place_photos", { place: code, max_rows: 30 });
+  if (comm.error) comm = await sb.rpc("community_photos", { place: code, max_rows: 24 });
   const mine = mineQ.data || [], others = comm.error ? [] : (comm.data || []);
   const all = [...mine, ...others];
   const urls = await signUrls([...all.map(p => p.path), ...all.map(p => thumbPath(p.path))]);
@@ -2364,6 +2403,14 @@ function setBanner(page, url) {
   }
 }
 
+function photoShareText() {
+  const circles = myCircles.filter(c => c.share_photos).map(c => c.name);
+  const parts = [];
+  if (circles.length) parts.push(circles.length === 1 ? `your circle ${circles[0]}` : `your circles (${circles.join(", ")})`);
+  if (sharingPhotos()) parts.push("the traveler community");
+  return parts.length ? `Shared with ${parts.join(" and ")}, by your screen name. Change this in Circles or Profile.`
+    : "Only you can see your photos. Share them with a circle (in Circles) or the traveler community (in Profile).";
+}
 function sharingPhotos() { return !!(myProfile && myProfile.is_public && myProfile.share_photos); }
 
 function photoSection(code, page) {
@@ -2386,7 +2433,7 @@ function photoSection(code, page) {
       el("button", { type: "button", class: "ph", "aria-label": mine ? `Open your photo ${i + 1}` : `Open photo by ${p.screen_name}`,
         onclick: () => openPhoto(code, list, i, mine, page, draw) },
         el("img", { src: p.thumb, alt: p.caption || "", loading: "lazy" }),
-        mine ? null : el("span", { class: "ph-by", text: p.screen_name }))));
+        mine ? null : el("span", { class: "ph-by", text: p.screen_name + (p.via && p.via !== "community" ? " · " + p.via : "") }))));
   }
   function draw() {
     const d = photoCache[code];
@@ -2403,11 +2450,9 @@ function photoSection(code, page) {
       el("h3", {}, "Your photos ", el("span", { class: "ph-count", text: `${n} of ${PHOTO_MAX}` })),
       n ? grid(d.mine, true) : el("p", { class: "hint", text: "Add up to 10 photos. They're shrunk on your device before uploading, and your first one becomes this page's banner." }),
       n < PHOTO_MAX ? addBtn : null, input, msg,
-      el("p", { class: "hint", text: sharingPhotos()
-        ? "Shared with the traveler community, by your screen name. Change this in Profile."
-        : "Only you can see your photos. To share them, turn on “Share my photos” in Profile." })
+      el("p", { class: "hint", text: photoShareText() })
     ];
-    if (d.others.length) kids.push(el("h3", { class: "ph-others", text: "From other travelers" }), grid(d.others, false));
+    if (d.others.length) kids.push(el("h3", { class: "ph-others", text: "Shared with you" }), grid(d.others, false));
     sec.replaceChildren(...kids);
   }
   draw();
@@ -2466,6 +2511,269 @@ async function removeAllMyPhotos() {
     const paths = data.flatMap(r => [r.path, thumbPath(r.path)]);
     for (let k = 0; k < paths.length; k += 100) await sb.storage.from("photos").remove(paths.slice(k, k + 100));
   } catch (e) { console.warn("Photo cleanup failed", e); }
+}
+
+/* ---------- Circles: private, invite-only groups (Personal = just you) ---------- */
+let myCircles = [];             // [{id, name, role, members, share_photos, invite_code}]
+let circlesNotSetUp = false;    // true until add-circles.sql has been run
+const JOIN_KEY = "wib-join";
+const inviteUrl = code => `${location.origin}${location.pathname}#join=${encodeURIComponent(code)}`;
+const circleErr = e => {
+  const m = (e && e.message) || "unknown error";
+  return /function|schema cache|does not exist/i.test(m) ? "Circles aren't set up yet. The site owner needs to run add-circles.sql in Supabase." : m;
+};
+
+async function loadCircles() {
+  if (!sb || !session) { myCircles = []; return; }
+  const { data, error } = await sb.rpc("my_circles");
+  circlesNotSetUp = !!error && /function|schema cache|does not exist/i.test(error.message || "");
+  myCircles = error ? [] : (data || []);
+}
+
+/* An invite link (#join=CODE) is remembered until the person is signed in. */
+function readJoinLink() {
+  const m = /(?:^#|&)join=([A-Za-z0-9_-]{6,40})/.exec(location.hash);
+  if (!m) return;
+  try { localStorage.setItem(JOIN_KEY, m[1]); } catch {}
+  try { history.replaceState(null, "", location.pathname + location.search); } catch {}
+}
+function pendingJoin() { try { return localStorage.getItem(JOIN_KEY) || ""; } catch { return ""; } }
+function clearJoin() { try { localStorage.removeItem(JOIN_KEY); } catch {} }
+
+async function maybeJoinPending() {
+  const code = pendingJoin();
+  if (!code || !sb || !session) return;
+  const { data, error } = await sb.rpc("circle_preview", { code });
+  const c = !error && data && data[0];
+  if (!c) { clearJoin(); toast(error ? "Couldn't open the circle invite" : "That circle invite link is no longer valid"); return; }
+  if (c.already) { clearJoin(); toast(`You're already in ${c.name}`); return; }
+  openJoin(code, c);
+}
+
+function openJoin(code, c) {
+  selected = null; paintMap();
+  showView("detail");
+  const meta = (session && session.user.user_metadata) || {};
+  const hasName = typeof meta.screen_name === "string" && meta.screen_name.trim();
+  const nameIn = el("input", { type: "text", id: "joinName", maxlength: "30", autocomplete: "nickname", placeholder: "e.g. Vinod" });
+  const share = el("input", { type: "checkbox", id: "joinShare", checked: true, style: "width:18px;height:18px;accent-color:var(--accent);margin:0" });
+  const msg = el("p", { class: "hint", "aria-live": "polite" });
+  const join = el("button", { type: "button", class: "visit-btn on" }, `Join ${c.name}`);
+  join.onclick = async () => {
+    const name = nameIn.value.trim();
+    if (!hasName && !name) { msg.textContent = "Choose a screen name so the circle knows who you are."; msg.style.color = "var(--danger)"; nameIn.focus(); return; }
+    join.disabled = true; join.textContent = "Joining…";
+    if (!hasName) {
+      await saveProfile({ screen_name: name });
+      const acct = await sb.auth.updateUser({ data: { screen_name: name } });
+      if (acct.data && acct.data.user) session = { ...session, user: acct.data.user };
+      setStatus("ok", signedInText());
+    }
+    const { data, error } = await sb.rpc("join_circle", { code, share: share.checked });
+    if (error) { msg.textContent = circleErr(error); msg.style.color = "var(--danger)"; join.disabled = false; join.textContent = `Join ${c.name}`; return; }
+    clearJoin();
+    await loadCircles();
+    Object.keys(boardCache).forEach(k => delete boardCache[k]);
+    Object.keys(photoCache).forEach(k => delete photoCache[k]);
+    toast(`You joined ${data.name}`);
+    openCircles(data.id);
+  };
+  $("detail").replaceChildren(
+    el("button", { type: "button", class: "back", onclick: () => { clearJoin(); closeDetail(); } }, "← Not now"),
+    el("div", { class: "d-head" }, el("h2", { text: "Join a circle" })),
+    el("section", { class: "sec" },
+      el("p", {}, "You've been invited to ", el("b", { text: c.name }), ` (${c.members} member${c.members == 1 ? "" : "s"}).`),
+      el("p", { class: "hint", text: "Circle members see your screen name, home, how many places you've been and which ones. Never your email, trips or notes." }),
+      hasName ? null : el("label", { class: "field", for: "joinName" }, "Your screen name", nameIn),
+      el("div", { style: "display:flex;gap:10px;align-items:flex-start;margin:12px 0" }, share,
+        el("label", { for: "joinShare", style: "cursor:pointer;font-size:14.5px" }, el("b", { text: "Share my photos with this circle" }), el("br"),
+          el("span", { class: "hint", text: "You can change this any time in Circles." }))),
+      join, msg));
+}
+
+let openCircleIds = new Set();
+async function openCircles(focusId) {
+  if (!session) return;
+  selected = null; paintMap();
+  showView("detail");
+  if (focusId) openCircleIds.add(focusId);
+  const box = el("div", { style: "display:grid;gap:14px" }, el("p", { class: "hint", text: "Loading your circles…" }));
+  $("detail").replaceChildren(
+    el("button", { type: "button", class: "back", onclick: closeDetail }, "← Back"),
+    el("div", { class: "d-head" }, el("h2", { text: "Circles" })),
+    el("p", { class: "hint", text: "A circle is a private group you invite people to: family, friends, a travel club. Members compare maps on the circle's leaderboard, see who has been where, and can share photos with each other. Only screen names are shown; never email, trips or notes." }),
+    box);
+  await loadCircles();
+  drawCircles(box);
+}
+
+function drawCircles(box) {
+  const personal = el("div", { class: "circle-card personal" },
+    el("div", { class: "circle-head" }, el("b", { text: "Personal" }), el("span", { class: "circle-tag", text: "Just you" })),
+    el("p", { class: "hint", text: "Everyone has this one. Your map, trips, notes and photos are yours alone unless you share them with a circle or the traveler community." }));
+  if (circlesNotSetUp) { box.replaceChildren(personal, el("p", { class: "hint", text: "Circles aren't set up yet. The site owner needs to run add-circles.sql in Supabase." })); return; }
+
+  const nameIn = el("input", { type: "text", maxlength: "60", placeholder: "e.g. Kasturi Family", "aria-label": "New circle name" });
+  const createMsg = el("p", { class: "hint", "aria-live": "polite" });
+  const create = el("button", { type: "button", class: "add" }, "+ Create a circle");
+  create.onclick = async () => {
+    const n = nameIn.value.trim();
+    if (!n) { nameIn.focus(); createMsg.textContent = "Give your circle a name."; return; }
+    create.disabled = true;
+    const { data, error } = await sb.rpc("create_circle", { circle_name: n });
+    create.disabled = false;
+    if (error) { createMsg.textContent = circleErr(error); createMsg.style.color = "var(--danger)"; return; }
+    openCircleIds.add(data.id);
+    await loadCircles(); Object.keys(boardCache).forEach(k => delete boardCache[k]);
+    drawCircles(box);
+    toast(`${data.name} created. Copy the invite link to add people.`);
+  };
+  const createBox = el("section", { class: "sec" }, el("h3", { text: "Start a new circle" }),
+    el("div", { style: "display:flex;gap:8px;flex-wrap:wrap" }, el("div", { style: "flex:1;min-width:180px" }, nameIn), create), createMsg,
+    el("p", { class: "hint", text: "You'll be its admin. You can be in up to 10 circles; each holds up to 50 people." }));
+
+  box.replaceChildren(personal, ...myCircles.map(c => circleCard(c, box)), createBox);
+}
+
+function circleCard(c, box) {
+  const admin = c.role === "admin";
+  const body = el("div", { class: "circle-body" }, el("p", { class: "hint", text: "Loading…" }));
+  const d = el("details", { class: "circle-card" },
+    el("summary", { class: "circle-head" }, el("b", { text: c.name }),
+      el("span", { class: "circle-tag", text: `${c.members} member${c.members == 1 ? "" : "s"}` }),
+      admin ? el("span", { class: "circle-tag admin", text: "Admin" }) : null),
+    body);
+  let filled = false;
+  const fill = () => { if (!filled) { filled = true; circleBody(c, body, box); } };
+  d.addEventListener("toggle", () => { if (d.open) { openCircleIds.add(c.id); fill(); } else openCircleIds.delete(c.id); });
+  if (openCircleIds.has(c.id)) { d.open = true; fill(); }
+  return d;
+}
+
+async function circleBody(c, body, box) {
+  const admin = c.role === "admin";
+  const [mem, tog] = await Promise.all([
+    sb.rpc("circle_board", { circle: c.id, kind: "countries" }),
+    sb.rpc("circle_together", { circle: c.id })]);
+  const say = el("p", { class: "hint", "aria-live": "polite" });
+  const fail = e => { say.textContent = circleErr(e); say.style.color = "var(--danger)"; };
+  const redraw = async () => { await loadCircles(); Object.keys(boardCache).forEach(k => delete boardCache[k]); drawCircles(box); };
+  const kids = [];
+  const T = tog.data || {};
+  if (!tog.error) kids.push(el("p", { class: "together" }, "Together: ",
+    el("b", { text: `${T.countries || 0} countries` }), " · ", el("b", { text: `${T.states || 0} states` }), " · ",
+    el("b", { text: `${T.parks || 0} national parks` })));
+
+  // Members
+  const ul = el("ul", { class: "circle-members" });
+  (mem.data || []).forEach(m => {
+    const acts = [];
+    if (admin && !m.is_me) {
+      const act = (label, action, confirmText) => {
+        const b = el("button", { type: "button", class: "linkbtn" }, label);
+        let armed = false;
+        b.onclick = async () => {
+          if (confirmText && !armed) { armed = true; b.textContent = confirmText; return; }
+          b.disabled = true;
+          const { error } = await sb.rpc("circle_member_action", { circle: c.id, member: m.member_id, action });
+          if (error) { fail(error); b.disabled = false; return; }
+          redraw();
+        };
+        return b;
+      };
+      acts.push(m.role === "admin" ? act("Remove admin", "member") : act("Make admin", "admin"));
+      acts.push(act("Remove", "remove", "Tap to confirm"));
+    }
+    ul.append(el("li", { class: m.is_me ? "me" : "" },
+      el("span", { class: "who" }, el("b", { text: m.screen_name + (m.is_me ? " (you)" : "") }),
+        m.role === "admin" ? el("span", { class: "circle-tag admin", text: "Admin" }) : null,
+        el("span", { class: "hint", text: m.home || "" })),
+      el("span", { class: "sc", text: `${m.countries} ${m.countries == 1 ? "country" : "countries"}` }),
+      acts.length ? el("span", { class: "acts" }, ...acts) : null));
+  });
+  kids.push(el("h3", { text: "Members" }), mem.error ? el("p", { class: "hint", text: circleErr(mem.error) }) : ul,
+    el("p", { class: "hint", text: "See the full ranking for countries, states or national parks on the Leaderboard tab." }));
+
+  // My photo sharing
+  const sp = el("input", { type: "checkbox", id: "cs-" + c.id, checked: !!c.share_photos, style: "width:18px;height:18px;accent-color:var(--accent);margin:0" });
+  sp.onchange = async () => {
+    const { error } = await sb.rpc("set_circle_photo_share", { circle: c.id, share: sp.checked });
+    if (error) { fail(error); sp.checked = !sp.checked; return; }
+    c.share_photos = sp.checked; toast(sp.checked ? `Your photos are shared with ${c.name}` : `Your photos are no longer shared with ${c.name}`);
+  };
+  kids.push(el("div", { style: "display:flex;gap:10px;align-items:center;margin-top:6px" }, sp,
+    el("label", { for: "cs-" + c.id, style: "cursor:pointer" }, "Share my photos with this circle")));
+
+  // Admin tools
+  if (admin) {
+    const link = el("input", { type: "text", readonly: true, value: inviteUrl(c.invite_code), "aria-label": "Invite link", onfocus: e => e.target.select() });
+    const copy = el("button", { type: "button", class: "add" }, navigator.share ? "Share invite" : "Copy invite link");
+    copy.onclick = async () => {
+      const url = link.value;
+      if (navigator.share) { try { await navigator.share({ title: `Join ${c.name} on Where I've Been`, text: `Join my circle "${c.name}" on Where I've Been`, url }); return; } catch (e) { if (e && e.name === "AbortError") return; } }
+      try { await navigator.clipboard.writeText(url); toast("Invite link copied"); } catch { link.select(); toast("Press Ctrl+C (⌘C) to copy"); }
+    };
+    const reset = el("button", { type: "button", class: "linkbtn" }, "Make a new link");
+    let resetArmed = false;
+    reset.onclick = async () => {
+      if (!resetArmed) { resetArmed = true; reset.textContent = "Old link will stop working. Tap again"; return; }
+      const { data, error } = await sb.rpc("reset_circle_invite", { circle: c.id });
+      if (error) return fail(error);
+      c.invite_code = data; link.value = inviteUrl(data); reset.textContent = "Make a new link"; resetArmed = false; toast("New invite link made");
+    };
+    const rn = el("input", { type: "text", maxlength: "60", value: c.name, "aria-label": "Circle name" });
+    const rnBtn = el("button", { type: "button", class: "linkbtn" }, "Rename");
+    rnBtn.onclick = async () => {
+      const { error } = await sb.rpc("rename_circle", { circle: c.id, circle_name: rn.value.trim() });
+      if (error) return fail(error);
+      toast("Renamed"); redraw();
+    };
+    const del = el("button", { type: "button", class: "linkbtn danger" }, "Delete circle");
+    let delArmed = false;
+    del.onclick = async () => {
+      if (!delArmed) { delArmed = true; del.textContent = `Delete ${c.name} for everyone? Tap again`; return; }
+      const { error } = await sb.rpc("delete_circle", { circle: c.id });
+      if (error) return fail(error);
+      toast(`${c.name} deleted`); redraw();
+    };
+    kids.push(el("h3", { text: "Invite people" }),
+      el("p", { class: "hint", text: "Send this link by text or email. Anyone with it can join after signing in." }),
+      el("div", { style: "display:flex;gap:8px;flex-wrap:wrap;align-items:center" }, el("div", { style: "flex:1;min-width:200px" }, link), copy),
+      reset,
+      el("h3", { text: "Admin" }),
+      el("div", { style: "display:flex;gap:8px;align-items:center" }, el("div", { style: "flex:1" }, rn), rnBtn),
+      el("p", { class: "hint", text: "Admins can invite, rename, make others admins, remove members and delete the circle. A circle always keeps at least one admin." }),
+      del);
+  }
+  const leave = el("button", { type: "button", class: "linkbtn danger" }, "Leave circle");
+  let leaveArmed = false;
+  leave.onclick = async () => {
+    if (!leaveArmed) { leaveArmed = true; leave.textContent = "Leave? Tap again"; return; }
+    const { error } = await sb.rpc("leave_circle", { circle: c.id });
+    if (error) return fail(error);
+    openCircleIds.delete(c.id); toast(`You left ${c.name}`); redraw();
+  };
+  kids.push(leave, say);
+  body.replaceChildren(...kids);
+}
+
+/* "From your circles" on a place page */
+const circleVisitCache = {};
+function circleVisitors(code) {
+  if (!sb || !session || !myCircles.length) return null;
+  const p = el("p", { class: "circle-visitors hint" });
+  const show = rows => {
+    if (!rows || !rows.length) { p.hidden = true; return; }
+    p.hidden = false;
+    p.replaceChildren("👥 From your circles: ", ...rows.flatMap((r, i) => [i ? ", " : "", el("b", { text: r.screen_name }), r.first_year ? ` (${r.first_year})` : ""]));
+  };
+  const hit = circleVisitCache[code];
+  if (hit && Date.now() - hit.at < 5 * 60000) show(hit.rows);
+  else { p.hidden = true; sb.rpc("circle_place_visitors", { place: code }).then(({ data, error }) => {
+    circleVisitCache[code] = { at: Date.now(), rows: error ? [] : (data || []) };
+    if (selected === code) show(circleVisitCache[code].rows);
+  }); }
+  return p;
 }
 
 function closeDetail() {
@@ -2649,6 +2957,7 @@ function renderDetail() {
     page,
     el("button", { type: "button", class: "visit-btn" + (r.visited ? " on" : ""), disabled: ro, "aria-pressed": String(r.visited),
       onclick: () => setVisited(code, !r.visited) }, r.visited ? "✓ Visited" : "Mark as visited"),
+    circleVisitors(code),
     el("section", { class: "sec" },
       el("label", { class: "field", for: "firstYear" }, "Year first visited (optional)", yearInput),
       yearHint),
@@ -3078,7 +3387,11 @@ document.addEventListener("keydown", e => { if (e.key === "Escape" && selected) 
     if (!MAPS.states || !MAPS.parks) $("stateMsg").textContent = "This map couldn't load. You can still check places off in the list.";
     if (view !== "countries") switchView(view); else renderAll();
   }).catch(() => {});
-  initAuth().then(() => { if (location.hash === "#help") openHelp(); });
+  readJoinLink();
+  initAuth().then(() => {
+    if (location.hash === "#help") openHelp();
+    if (pendingJoin() && !session) authMsg("You've been invited to a circle. Sign in, or create an account, and you'll join it right after.");
+  });
 })();
 })();
 </script>
