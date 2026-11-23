@@ -2,6 +2,9 @@
 
 Releases of Where I've Been. Each release is one production deploy; the version shows in the map's bottom-right corner.
 
+## Pending release (on `preview`, not yet live)
+- v1.23: Circles. Everyone has "Personal" (just you). Start a circle (Circles, next to Profile) and you're its admin, with an invite link to send by text or email; people join after signing in or creating an account (they pick a screen name if they don't have one). Members see each other's screen name, home and counts, a "Together" total, a circle leaderboard for countries, states and national parks (Leaderboard tab, "Your circles"), and "From your circles: …" on place pages. Never email, trips or notes. Each member chooses whether to share photos with each circle; shared photos appear on place pages under "Shared with you". Admins invite, rename, make others admins, remove members, make a new invite link and delete the circle; a circle always keeps at least one admin (the longest-standing member takes over). Up to 10 circles per person, 50 members per circle. Doesn't require joining the traveler community. Requires add-circles.sql.
+
 ## v1.22 · Nov 21, 2026 (live)
 - The third map is called "National Parks" (switcher, Profile and Help), not "Parks".
 - Photos. Up to 10 per place (country, state or national park), added from the place's page. Shrunk on your device before upload (about 1600 px, usually 150–400 KB, plus a small thumbnail). Your first photo becomes the page's banner. Click to view in a viewer up to 900 × 700 (full screen on phones), add a caption, step through, or delete. Private by default; Profile has "Share my photos with the traveler community" (needs community membership), and shared photos appear to other members under "From other travelers" with the screen name. Deleting your account deletes your photos. Requires add-photos.sql.

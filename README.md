@@ -9,6 +9,7 @@ A travel map anyone can sign up for. Each person marks the countries they've vis
 - **World map colored by continent.** Visited countries show in full color and the rest are pale. Double-click a country to toggle it.
 - **Country pages** with a photo, the flag, capital, population, GDP, GDP per person, currency, government, main religion, languages and a short description.
 - **Your photos:** up to 10 per place, shrunk on your device before upload; your first becomes the banner. Private unless you share them with the traveler community.
+- **Circles:** private, invite-only groups (family, friends) with admins, a circle leaderboard, who has been where, and optional photo sharing. Everyone also has Personal (just you).
 - **Trips and notes** for each country, with arrival and departure dates.
 - **Stats:** "X of Y countries", share of the world, continents visited, days on the road, countries visited this year, and a percentage for each continent.
 - **Rank among all travelers** and your percentile, worked out without revealing anyone's countries.
@@ -67,6 +68,7 @@ flowchart LR
 | `countries-data.js` | Facts that rarely change, for about 200 countries: capital, currency, government, main religion, languages |
 | `schema.sql` | Creates the `visits` table, its security rules and the ranking function. Run once. |
 | `stats.sql` | The ranking function on its own, for databases set up before rankings were added |
+| `add-circles.sql` | Circles: private invite-only groups with admins, circle leaderboards, who-has-been-where and photo sharing. Run once, after add-photos.sql. |
 | `add-photos.sql` | Photos: private storage bucket, photos table (10 per place), sharing switch and community photos. Run once. |
 | `add-parks.sql` | National parks map: table, regions, leaderboard, rank and the 'parks' default view. Run once. |
 | `add-state-leaderboards.sql` | State leaderboards and state rank (run after add-states.sql). Run once. |
