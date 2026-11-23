@@ -69,6 +69,8 @@ flowchart LR
 | `schema.sql` | Creates the `visits` table, its security rules and the ranking function. Run once. |
 | `stats.sql` | The ranking function on its own, for databases set up before rankings were added |
 | `add-circles.sql` | Circles: private invite-only groups with admins, circle leaderboards, who-has-been-where and photo sharing. Run once, after add-photos.sql. |
+| `add-circle-invites.sql` | Circle invitations by email (pending invitations, Join/Decline). Run after add-circles.sql. |
+| `supabase/functions/circle-invite/index.ts` | Edge Function that creates accounts for new invitees and emails circle invitations through Resend. Deploy in Supabase → Edge Functions; secrets RESEND_API_KEY, INVITE_FROM, SITE_URL. |
 | `add-photos.sql` | Photos: private storage bucket, photos table (10 per place), sharing switch and community photos. Run once. |
 | `add-parks.sql` | National parks map: table, regions, leaderboard, rank and the 'parks' default view. Run once. |
 | `add-state-leaderboards.sql` | State leaderboards and state rank (run after add-states.sql). Run once. |

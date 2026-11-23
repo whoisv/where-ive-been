@@ -156,6 +156,12 @@ button, input, textarea { font: inherit; color: inherit; }
 .circle-members .acts { grid-column: 1 / -1; display: flex; gap: 14px; }
 .linkbtn.danger { color: var(--danger); }
 .circle-body > .linkbtn { justify-self: start; }
+.invite-results { list-style: none; margin: 6px 0 0; padding: 0; display: grid; gap: 4px; }
+.invite-results li { display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; font-size: 13.5px; padding: 6px 10px; border-radius: 8px; background: var(--bg); }
+.invite-results li > span:first-child { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.invite-results li.ok { box-shadow: inset 3px 0 0 #2e9e5b; }
+.circle-card.invite { border-color: var(--accent); }
+.circle-body > .add { justify-self: start; }
 .circle-visitors { margin: 8px 0 0; font-size: 13.5px; }
 .share-dlg { border: 0; padding: 0; background: transparent; max-width: none; max-height: none; color: var(--ink); }
 .share-dlg::backdrop { background: rgba(10, 16, 24, .55); backdrop-filter: blur(2px); }
@@ -492,7 +498,7 @@ details.more .more-body { display: grid; gap: 18px; padding: 4px 12px 14px; }
 "use strict";
 
 /* Bump on every change so it's easy to see which version is live. */
-const APP_VERSION = "v1.23 · Nov 23, 2026 · preview";
+const APP_VERSION = "v1.23 · Nov 23, 2026 · preview 2";
 
 /* ---------- Reference data ---------- */
 const CONTINENTS = {
@@ -831,7 +837,7 @@ async function loadRecords() {
   renderSummary();
   await loadCircles();
   if (tab === "board") { loadBoard(true); renderList(); }
-  maybeJoinPending();
+  if (authMode !== "reset") maybeJoinPending();
 }
 
 
@@ -2540,17 +2546,35 @@ function readJoinLink() {
 function pendingJoin() { try { return localStorage.getItem(JOIN_KEY) || ""; } catch { return ""; } }
 function clearJoin() { try { localStorage.removeItem(JOIN_KEY); } catch {} }
 
+let myInvites = [];             // invitations sent to my email address
+async function loadInvites() {
+  if (!sb || !session) { myInvites = []; return; }
+  const { data, error } = await sb.rpc("my_invites");
+  myInvites = error ? [] : (data || []);
+}
+
+/* After sign-in: email invitations first, then an invite link that was opened. */
 async function maybeJoinPending() {
+  if (!sb || !session) return;
+  await loadInvites();
+  if (myInvites.length) { openInvite(myInvites[0]); return; }
   const code = pendingJoin();
-  if (!code || !sb || !session) return;
+  if (!code) return;
   const { data, error } = await sb.rpc("circle_preview", { code });
   const c = !error && data && data[0];
   if (!c) { clearJoin(); toast(error ? "Couldn't open the circle invite" : "That circle invite link is no longer valid"); return; }
   if (c.already) { clearJoin(); toast(`You're already in ${c.name}`); return; }
-  openJoin(code, c);
+  openJoin({ name: c.name, members: c.members },
+    share => sb.rpc("join_circle", { code, share }),
+    async () => { clearJoin(); });
+}
+function openInvite(inv) {
+  openJoin({ name: inv.circle_name, members: inv.members, invitedBy: inv.invited_by },
+    share => sb.rpc("respond_invite", { invite: inv.id, accept: true, share }),
+    async () => { await sb.rpc("respond_invite", { invite: inv.id, accept: false }); toast(`Invitation to ${inv.circle_name} declined`); });
 }
 
-function openJoin(code, c) {
+function openJoin(c, doJoin, doDecline) {
   selected = null; paintMap();
   showView("detail");
   const meta = (session && session.user.user_metadata) || {};
@@ -2559,6 +2583,7 @@ function openJoin(code, c) {
   const share = el("input", { type: "checkbox", id: "joinShare", checked: true, style: "width:18px;height:18px;accent-color:var(--accent);margin:0" });
   const msg = el("p", { class: "hint", "aria-live": "polite" });
   const join = el("button", { type: "button", class: "visit-btn on" }, `Join ${c.name}`);
+  const decline = el("button", { type: "button", class: "linkbtn", style: "justify-self:center;margin-top:10px" }, c.invitedBy ? "Decline" : "Not now");
   join.onclick = async () => {
     const name = nameIn.value.trim();
     if (!hasName && !name) { msg.textContent = "Choose a screen name so the circle knows who you are."; msg.style.color = "var(--danger)"; nameIn.focus(); return; }
@@ -2569,26 +2594,34 @@ function openJoin(code, c) {
       if (acct.data && acct.data.user) session = { ...session, user: acct.data.user };
       setStatus("ok", signedInText());
     }
-    const { data, error } = await sb.rpc("join_circle", { code, share: share.checked });
+    const { data, error } = await doJoin(share.checked);
     if (error) { msg.textContent = circleErr(error); msg.style.color = "var(--danger)"; join.disabled = false; join.textContent = `Join ${c.name}`; return; }
     clearJoin();
     await loadCircles();
     Object.keys(boardCache).forEach(k => delete boardCache[k]);
     Object.keys(photoCache).forEach(k => delete photoCache[k]);
+    Object.keys(circleVisitCache).forEach(k => delete circleVisitCache[k]);
     toast(`You joined ${data.name}`);
-    openCircles(data.id);
+    await loadInvites();
+    if (myInvites.length) openInvite(myInvites[0]); else openCircles(data.id);
+  };
+  decline.onclick = async () => {
+    decline.disabled = true;
+    await doDecline();
+    await loadInvites();
+    if (myInvites.length) openInvite(myInvites[0]); else closeDetail();
   };
   $("detail").replaceChildren(
-    el("button", { type: "button", class: "back", onclick: () => { clearJoin(); closeDetail(); } }, "← Not now"),
     el("div", { class: "d-head" }, el("h2", { text: "Join a circle" })),
-    el("section", { class: "sec" },
-      el("p", {}, "You've been invited to ", el("b", { text: c.name }), ` (${c.members} member${c.members == 1 ? "" : "s"}).`),
+    el("section", { class: "sec", style: "display:grid" },
+      el("p", {}, c.invitedBy ? el("b", { text: c.invitedBy }) : "You've", c.invitedBy ? " invited you to " : " been invited to ",
+        el("b", { text: c.name }), ` (${c.members} member${c.members == 1 ? "" : "s"}).`),
       el("p", { class: "hint", text: "Circle members see your screen name, home, how many places you've been and which ones. Never your email, trips or notes." }),
       hasName ? null : el("label", { class: "field", for: "joinName" }, "Your screen name", nameIn),
       el("div", { style: "display:flex;gap:10px;align-items:flex-start;margin:12px 0" }, share,
         el("label", { for: "joinShare", style: "cursor:pointer;font-size:14.5px" }, el("b", { text: "Share my photos with this circle" }), el("br"),
           el("span", { class: "hint", text: "You can change this any time in Circles." }))),
-      join, msg));
+      join, decline, msg));
 }
 
 let openCircleIds = new Set();
@@ -2603,7 +2636,7 @@ async function openCircles(focusId) {
     el("div", { class: "d-head" }, el("h2", { text: "Circles" })),
     el("p", { class: "hint", text: "A circle is a private group you invite people to: family, friends, a travel club. Members compare maps on the circle's leaderboard, see who has been where, and can share photos with each other. Only screen names are shown; never email, trips or notes." }),
     box);
-  await loadCircles();
+  await Promise.all([loadCircles(), loadInvites()]);
   drawCircles(box);
 }
 
@@ -2632,7 +2665,11 @@ function drawCircles(box) {
     el("div", { style: "display:flex;gap:8px;flex-wrap:wrap" }, el("div", { style: "flex:1;min-width:180px" }, nameIn), create), createMsg,
     el("p", { class: "hint", text: "You'll be its admin. You can be in up to 10 circles; each holds up to 50 people." }));
 
-  box.replaceChildren(personal, ...myCircles.map(c => circleCard(c, box)), createBox);
+  const invites = myInvites.map(inv => el("div", { class: "circle-card invite" },
+    el("div", { class: "circle-head" }, el("b", { text: inv.circle_name }), el("span", { class: "circle-tag admin", text: "Invitation" })),
+    el("p", { class: "hint", text: `${inv.invited_by} invited you · ${inv.members} member${inv.members == 1 ? "" : "s"}` }),
+    el("button", { type: "button", class: "add", onclick: () => openInvite(inv) }, "See invitation")));
+  box.replaceChildren(personal, ...invites, ...myCircles.map(c => circleCard(c, box)), createBox);
 }
 
 function circleCard(c, box) {
@@ -2736,7 +2773,47 @@ async function circleBody(c, body, box) {
       if (error) return fail(error);
       toast(`${c.name} deleted`); redraw();
     };
-    kids.push(el("h3", { text: "Invite people" }),
+    // Invite by email
+    const emailsIn = el("textarea", { rows: "3", placeholder: "asha@example.com, raj@example.com", "aria-label": "Email addresses to invite", style: "width:100%;box-sizing:border-box;font:inherit;padding:8px;border-radius:8px;border:1px solid var(--line);background:var(--surface);color:var(--ink)" });
+    const sendBtn = el("button", { type: "button", class: "add" }, "Send invitations");
+    const sendOut = el("ul", { class: "invite-results" });
+    const pendingBox = el("div");
+    const STATUS = { sent: "Invitation sent", member: "Already in the circle", recent: "Already invited in the last hour", invalid: "Not a valid email address",
+      limit: "Daily limit reached (50 a day); try tomorrow", full: "The circle is full (50)", failed: "Couldn't send; try again later", invite: "Queued" };
+    const loadPending = async () => {
+      const { data, error } = await sb.rpc("circle_pending_invites", { circle: c.id });
+      if (error || !data || !data.length) { pendingBox.replaceChildren(); return; }
+      pendingBox.replaceChildren(el("p", { class: "hint", style: "margin:8px 0 4px", text: "Waiting for a reply:" }),
+        el("ul", { class: "invite-results" }, data.map(i => {
+          const x = el("button", { type: "button", class: "linkbtn" }, "Cancel");
+          x.onclick = async () => { x.disabled = true; const r = await sb.rpc("cancel_circle_invite", { invite: i.id }); if (r.error) fail(r.error); loadPending(); };
+          return el("li", {}, el("span", { text: i.email }), el("span", { class: "hint", text: new Date(i.sent_at).toLocaleDateString() }), x);
+        })));
+    };
+    sendBtn.onclick = async () => {
+      const emails = [...new Set((emailsIn.value.match(/[^\s,;<>()"'\[\]]+@[^\s,;<>()"'\[\]]+/g) || []).map(e => e.toLowerCase()))];
+      if (!emails.length) { say.textContent = "No email addresses found."; say.style.color = "var(--danger)"; emailsIn.focus(); return; }
+      if (emails.length > 20) { say.textContent = "Up to 20 email addresses at a time."; say.style.color = "var(--danger)"; return; }
+      sendBtn.disabled = true; sendBtn.textContent = "Sending…"; say.textContent = ""; sendOut.replaceChildren();
+      try {
+        const { data, error } = await sb.functions.invoke("circle-invite", { body: { circle: c.id, emails } });
+        let errText = data && data.error;
+        if (error && !errText) {
+          try { const b = await error.context.json(); errText = b && b.error; } catch {}
+          errText = errText || (/not found|404|Failed to send/i.test(error.message || "") ? "Email invitations aren't set up yet. The site owner needs to add the circle-invite function in Supabase." : error.message);
+        }
+        if (errText) { fail({ message: errText }); return; }
+        sendOut.replaceChildren(...(data.results || []).map(r => el("li", { class: r.status === "sent" ? "ok" : "" },
+          el("span", { text: r.email }), el("span", { class: "hint", text: STATUS[r.status] || r.status }))));
+        if ((data.results || []).some(r => r.status === "sent")) emailsIn.value = "";
+        loadPending();
+      } finally { sendBtn.disabled = false; sendBtn.textContent = "Send invitations"; }
+    };
+    loadPending();
+    kids.push(el("h3", { text: "Invite by email" }),
+      el("p", { class: "hint", text: "Type or paste up to 20 email addresses. Each person gets an email from Where I've Been; people without an account get one made for them and choose their own password. Nobody is added until they tap Join." }),
+      emailsIn, sendBtn, sendOut, pendingBox);
+    kids.push(el("h3", { text: "Or share an invite link" }),
       el("p", { class: "hint", text: "Send this link by text or email. Anyone with it can join after signing in." }),
       el("div", { style: "display:flex;gap:8px;flex-wrap:wrap;align-items:center" }, el("div", { style: "flex:1;min-width:200px" }, link), copy),
       reset,
