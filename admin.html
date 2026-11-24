@@ -150,6 +150,15 @@ dialog.ga::backdrop { background: rgba(10,16,24,.55); }
 .ga-share { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
 .ga-share .btn { text-align: center; }
 .hint { font-size: 13px; color: var(--muted); }
+/* Invite to circle */
+td.pick, th.pick { width: 28px; padding-right: 0; }
+td.pick input, th.pick input { width: 16px; height: 16px; accent-color: var(--accent); margin: 0; cursor: pointer; }
+.invbar { position: sticky; bottom: 12px; z-index: 2; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 12px; padding: 10px 14px; border-radius: 12px; background: var(--surface); border: 1px solid var(--accent); box-shadow: 0 8px 24px rgba(0,0,0,.18); }
+.invbar b { font-weight: 600; }
+.invbar select { border: 1px solid var(--line); background: var(--bg); border-radius: 8px; padding: 7px 8px; max-width: 260px; }
+.inv-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; max-height: 50vh; overflow: auto; }
+.inv-list li { display: flex; justify-content: space-between; gap: 10px; font-size: 13.5px; padding: 6px 10px; border-radius: 8px; background: var(--bg); }
+.inv-list li.ok { box-shadow: inset 3px 0 0 var(--good); }
 </style>
 </head>
 <body>
@@ -211,6 +220,7 @@ dialog.ga::backdrop { background: rgba(10,16,24,.55); }
         </table>
       </div>
       <div class="count" id="count"></div>
+      <div class="invbar" id="invBar" hidden></div>
     </section>
   </main>
 </div>
@@ -461,7 +471,16 @@ function renderTable() {
   }));
   const rows = filtered();
   const time = iso => iso ? el("span", { title: dateTimeFmt.format(new Date(iso)), text: ago(iso) }) : el("span", { class: "dim", text: "—" });
+  const pickable = rows.filter(u => u.id !== me && u.email);
+  const all = el("input", { type: "checkbox", "aria-label": "Select everyone shown" });
+  all.checked = pickable.length > 0 && pickable.every(u => picked.has(u.id));
+  all.indeterminate = !all.checked && pickable.some(u => picked.has(u.id));
+  all.onchange = () => { pickable.forEach(u => all.checked ? picked.add(u.id) : picked.delete(u.id)); renderTable(); };
+  $("thead").prepend(el("th", { class: "pick", scope: "col" }, all));
   $("tbody").replaceChildren(...rows.map(u => el("tr", {},
+    el("td", { class: "pick" }, u.id === me || !u.email ? "" : Object.assign(
+      el("input", { type: "checkbox", "aria-label": `Select ${u.email}` }),
+      { checked: picked.has(u.id), onchange: e => { e.target.checked ? picked.add(u.id) : picked.delete(u.id); renderTable(); } })),
     el("td", {}, el("span", { class: "email", text: u.email || "(no email)" }), " ",
       u.id === me ? el("span", { class: "pill me", text: "you" }) : u.is_admin ? el("span", { class: "pill me", text: "admin" }) : "",
       u.screen_name && u.screen_name !== u.email ? el("span", { class: "sn", text: u.screen_name }) : ""),
@@ -478,7 +497,8 @@ function renderTable() {
     el("td", { class: "r", text: fmt(u.trips) }),
     el("td", { class: "r", text: fmt(u.notes) })
   )));
-  if (!rows.length) $("tbody").append(el("tr", {}, el("td", { colspan: COLS.length, class: "empty", text: "No travelers match." })));
+  if (!rows.length) $("tbody").append(el("tr", {}, el("td", { colspan: COLS.length + 1, class: "empty", text: "No travelers match." })));
+  renderInviteBar();
   $("count").textContent = rows.length === data.users.length ? `${fmt(rows.length)} travelers` : `Showing ${fmt(rows.length)} of ${fmt(data.users.length)} travelers`;
 }
 $("q").oninput = () => renderTable();
@@ -593,6 +613,73 @@ function openGive(prefill = "") {
   if (prefill) form.requestSubmit();
 }
 $("giveBtn").onclick = () => openGive();
+
+/* ---------- Invite selected travelers to a circle ----------
+   Uses the same "circle-invite" Edge Function as the Circles page: each person gets an email and
+   taps Join or Decline; nobody is added without saying yes. You must be an admin of the circle. */
+const picked = new Set();
+let adminCircles = null;   // circles where I'm an admin
+async function loadAdminCircles() {
+  const { data: rows, error } = await sb.rpc("my_circles");
+  adminCircles = error ? [] : (rows || []).filter(c => c.role === "admin");
+  adminCircles.err = error ? error.message || "error" : null;
+}
+function renderInviteBar() {
+  const bar = $("invBar");
+  if (!picked.size) { bar.hidden = true; return; }
+  bar.hidden = false;
+  const n = picked.size;
+  const clear = Object.assign(el("button", { type: "button", class: "btn", text: "Clear" }), { onclick: () => { picked.clear(); renderTable(); } });
+  if (!adminCircles) { bar.replaceChildren(el("b", { text: `${n} selected` }), el("span", { class: "hint", text: "Loading your circles…" }), clear); loadAdminCircles().then(renderInviteBar); return; }
+  if (!adminCircles.length) {
+    bar.replaceChildren(el("b", { text: `${n} selected` }),
+      el("span", { class: "hint" }, adminCircles.err ? "Circles aren't set up yet (run add-circles.sql). " : "You're not an admin of any circle yet. Create one on the map under Circles, then come back. ",
+        Object.assign(el("button", { type: "button", class: "ga-link", text: "Check again" }), { onclick: () => { adminCircles = null; renderInviteBar(); } })), clear);
+    return;
+  }
+  const sel = el("select", { "aria-label": "Circle" }, ...adminCircles.map(c => el("option", { value: c.id, text: `${c.name} (${c.members})` })));
+  if (renderInviteBar.last && adminCircles.some(c => c.id === renderInviteBar.last)) sel.value = renderInviteBar.last;
+  sel.onchange = () => { renderInviteBar.last = sel.value; };
+  const go = Object.assign(el("button", { type: "button", class: "btn primary", text: `Invite ${n} to circle` }), { onclick: () => sendCircleInvites(sel.value) });
+  bar.replaceChildren(el("b", { text: `${n} selected` }), el("span", { class: "hint", text: "Invite to" }), sel, go, clear);
+}
+async function sendCircleInvites(circleId) {
+  renderInviteBar.last = circleId;
+  const circle = adminCircles.find(c => c.id === circleId);
+  const people = data.users.filter(u => picked.has(u.id) && u.email);
+  const emails = people.map(u => u.email.toLowerCase());
+  if (!confirm(`Email ${emails.length} ${emails.length === 1 ? "person" : "people"} an invitation to join ${circle.name}?\n\nThey'll be added only if they tap Join.`)) return;
+  const dlg = $("gaDlg");
+  const list = el("ul", { class: "inv-list" });
+  const status = el("p", { class: "hint", text: "Sending…" });
+  dlg.replaceChildren(
+    el("div", { class: "ga-top" }, el("h2", { id: "gaTitle", text: `Invite to ${circle.name}` }),
+      Object.assign(el("button", { type: "button", class: "ga-x", "aria-label": "Close", text: "✕" }), { onclick: () => dlg.close() })),
+    el("div", { class: "ga-body" }, status, list));
+  dlg.onclick = e => { if (e.target === dlg) dlg.close(); };
+  dlg.onclose = null;
+  dlg.showModal();
+  const LABEL = { sent: "Invitation sent", member: "Already in the circle", recent: "Invited in the last hour", invalid: "Not a valid email",
+    limit: "Daily limit reached (50 a day)", full: "Circle is full (50)", failed: "Couldn't send" };
+  let sent = 0;
+  for (let i = 0; i < emails.length; i += 20) {
+    status.textContent = `Sending ${Math.min(i + 20, emails.length)} of ${emails.length}…`;
+    const { data: r, error } = await sb.functions.invoke("circle-invite", { body: { circle: circleId, emails: emails.slice(i, i + 20) } });
+    let err = r && r.error;
+    if (error && !err) { try { const b = await error.context.json(); err = b && b.error; } catch {} err = err || error.message; }
+    if (err) {
+      list.append(el("li", {}, el("span", { class: "ga-err", text: /not found|404|Failed to send/i.test(err) ? "The circle-invite function isn't set up in Supabase yet." : err })));
+      break;
+    }
+    (r.results || []).forEach(x => {
+      if (x.status === "sent") sent++;
+      list.append(el("li", { class: x.status === "sent" ? "ok" : "" }, el("span", { text: x.email }), el("span", { class: "hint", text: LABEL[x.status] || x.status })));
+    });
+  }
+  status.className = sent ? "ga-ok" : "hint";
+  status.textContent = sent ? `Sent ${sent} invitation${sent === 1 ? "" : "s"}. People join ${circle.name} when they tap Join.` : "No invitations were sent.";
+  if (sent) { picked.clear(); adminCircles = null; renderTable(); }
+}
 
 start();
 </script>
